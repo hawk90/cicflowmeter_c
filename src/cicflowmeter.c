@@ -4,7 +4,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
-#include "common/cicflowmeter_common.h"
+#include "common/cicflowmeter-common.h"
 
 void hello_print()
 {
@@ -27,12 +27,14 @@ int main(int argc, char *argv[]) {
      struct pcap_pkthdr packet_header;
     int packet_count_limit = 1;
     int timeout_limit = 10000; /* In milliseconds */
-
-    device = pcap_lookupdev(error_buffer);
+	
+	/*
+    device = pcap_findalldevs(error_buffer);
     if (device == NULL) {
         printf("Error finding device: %s\n", error_buffer);
         return 1;
     }
+	*/
 
     /* Open device for live capture */
     handle = pcap_open_live(
