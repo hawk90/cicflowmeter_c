@@ -1,7 +1,7 @@
 #ifndef __CICFLOWMETER_H__
 #define __SURICATA_H__
 
-#include "suricata-common.h"
+#include "common/cicflowmeter-common.h"
 //#include "packet-queue.h"
 
 /* the name of our binary */
