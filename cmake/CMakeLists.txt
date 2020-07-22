@@ -18,14 +18,15 @@ SET ( OUTPUT_ELF "${CMAKE_PROJECT_NAME}" )
 #        )
 FILE( GLOB_RECURSE SRC_FILES 
 		../src/*.c ../src/*.h
-		../src/common/*.h)
+		../src/utils/*c ../src/utils/*h
+		,,/src/common/*.h)
  
 # 공통 컴파일러
 SET ( CMAKE_C_COMPILER "gcc" )
 SET ( CMAKE_C_STANDARD 11 )
 
 # 공통 헤더 파일 Include 디렉토리 (-I)
-#INCLUDE_DIRECTORIES ( <디렉토리> <디렉토리> ... )
+#INCLUDE_DIRECTORIES ( include ../src/common/ )
  
 # 공통 컴파일 옵션, 링크 옵션
 ADD_COMPILE_OPTIONS ( -g -Wall )
