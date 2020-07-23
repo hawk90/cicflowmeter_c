@@ -1,0 +1,26 @@
+#include<stdarg.h>
+
+typedef enum {
+	LOG_NOT_SET		= -1,
+	LOG_NONE		= 0,
+	LOG_EMERGENCY,
+	LOG_ALERT,
+	LOG_CRITICAL,
+	LOG_ERROR,
+	LOG_WARNING,
+	LOG_NOTICE,
+	LOG_INFO,
+	LOG_PERFORMANCE,
+	LOG_CONFIG,
+	LOG_DEBUG,
+	LOG_LEVEL_MAX,
+} LogLevel;
+
+typedef struct {
+	va_list ap;
+
+}
+
+#define LOG_MAX_LOG_MSG_LENGTH			2048
+#define LOG_LOGMAX_LOG_FORMAT_LENGTH	128
+#define LOG_DEFAULT_LOG_LEVEL			LOG_INFO
