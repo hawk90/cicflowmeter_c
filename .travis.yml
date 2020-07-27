@@ -1,0 +1,4 @@
+language: c
+
+script:
+	bazel test //tests:tests
