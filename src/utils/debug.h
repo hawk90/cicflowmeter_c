@@ -20,7 +20,7 @@ extern "C" {
 typedef enum {
     LOG_NOTSET = -1,	/* */
     LOG_NONE = 0,		/* */
-	LOG_TRACE,			/* finer-grained information events than the DEBUG */
+    LOG_TRACE,			/* finer-grained information events than the DEBUG */
     LOG_DEBUG,			/* fine-grained information events that are most useful to debug an application */
     LOG_CONFIG,			/* */
     LOG_PERF,			/* */
