@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#if 0
 ENUM_CHAR_MAP log_level_map[ ] = {
     { "Not set",        LOG_NOTSET},
     { "None",           LOG_NONE },
@@ -18,7 +19,7 @@ ENUM_CHAR_MAP log_level_map[ ] = {
     { "Debug",          LOG_DEBUG },
     { NULL,             -1 }
 };
-
+#endif
 
 /**
  * \brief Adds the global log_format to the outgoing buffer
