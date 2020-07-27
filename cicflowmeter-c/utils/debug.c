@@ -270,6 +270,6 @@ void LOG(const LogLevel log_level, const char *file, const char *func,
 	vsnprintf(msg, sizeof(msg), fmt, ap);
 	va_end(ap);
 
-	LogMessage(log_level, file, func, line, OK, msg);
+	log_message(log_level, file, func, line, OK, msg);
 
 }

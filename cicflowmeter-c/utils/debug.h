@@ -58,7 +58,7 @@ void LOG_ERR(const LogLevel log_level, const char *file, const char *func,
 		const uint32_t line, const Error error_code, const char *fmt, ...) CHECK_PRINTF(6, 7);
 
 
-Error LogMessage(const LogLevel log_level, const char *file, const char *func,
+Error log_message(const LogLevel log_level, const char *file, const char *func,
 					const uint32_t line, const Error error_code, const char *message);
 
 #ifdef __cplusplus

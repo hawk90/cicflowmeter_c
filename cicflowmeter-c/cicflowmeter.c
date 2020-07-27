@@ -4,7 +4,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
-#include "common/cicflowmeter-common.h"
+
+#include "utils/debug.h"
 
 #define NEXT_EX_OK 1
 
@@ -22,6 +23,7 @@ void hello_print()
 int main(int argc, char *argv[]) {
 	hello_print();
 
+#if 0
 	int rc = 0;
 	const char *dev = "enp0s3";
 	pcap_t *handle;
@@ -45,5 +47,6 @@ int main(int argc, char *argv[]) {
     return 0;
 
 error:
+#endif
 	return -1;
 }
