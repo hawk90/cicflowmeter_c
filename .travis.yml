@@ -1,4 +1,17 @@
 language: c
 
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - curl
+      - gnupg
+      
+before_install:
+  - apt install curl gnupg
+  - curl -f https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
+  - echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+
 script:
   bazel test //tests:tests
