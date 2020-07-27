@@ -4,16 +4,19 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
 	name = "debug-dep",
+	srcs = [
+		"debug.c",
+	],
 	hdrs = [
 		"debug.h",
 		"error.h",
 	],
 )
 
-cc_binary(
-	name = "debug",
-	srcs = ["debug.c"],
-	deps = [
-		":debug-dep",
-	],
-)
+#cc_binary(
+#	name = "debug",
+#	srcs = ["debug.c"],
+#	deps = [
+#		":debug-dep",
+#	],
+#)
