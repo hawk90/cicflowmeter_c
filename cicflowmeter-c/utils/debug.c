@@ -31,6 +31,7 @@ ENUM_CHAR_MAP log_level_map[ ] = {
  *
  * \retval OK on success; else an error code
  */
+#if 0
 static ERROR LogMessageGetBuffer(
         struct timeval *tval, int color, LogType type,
                      char *buffer, size_t buffer_size,
@@ -249,7 +250,7 @@ static ERROR LogMessageGetBuffer(
 
     return OK;
 }
-
+#endif
 
 Error log_message(const LogLevel log_level, const char *file, const char *func, const uint32_t line, Error error_code, const char *message)
 {	
