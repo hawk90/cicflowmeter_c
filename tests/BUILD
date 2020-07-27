@@ -1,6 +1,6 @@
 cc_test(
 	name = "tests",
-	srcs = glob(["**/*.c"]),
+	srcs = glob(["**/*.cc"]),
 	deps = [
 		"//src/utils:debug",
 		"@gtest//:gtest",
