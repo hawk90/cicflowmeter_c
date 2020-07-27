@@ -1,13 +1,19 @@
-#ifndef __CICFLOWMETER_UTIL_DEBUG_H__
-#define __CICFLOWMETER_UTIL_DEBUG_H__
+#ifndef __CICFLOWMETER_UTILS_DEBUG_H__
+#define __CICFLOWMETER_UTILS_DEBUG_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include <stdint.h>
+#include <time.h>
 
 #include "error.h"
+
+struct timeval {
+  time_t      tv_sec;     /* seconds */
+  long        tv_usec;    /* microseconds */
+};
 
 // TODO: goto common.h and what is means?
 #if defined __GNUC__
@@ -50,6 +56,18 @@ typedef enum {
 
 #define DEF_LOG_TYPE LOG_TYPE_STREAM
 
+#define LOG_FMT_TIME             't' /* Timestamp in standard format */
+#define LOG_FMT_PID              'p' /* PID */
+#define LOG_FMT_TID              'i' /* Thread ID */
+#define LOG_FMT_TM               'm' /* Thread module name */
+#define LOG_FMT_LOG_LEVEL        'd' /* Log level */
+#define LOG_FMT_FILE_NAME        'f' /* File name */
+#define LOG_FMT_LINE             'l' /* Line number */
+#define LOG_FMT_FUNCTION         'n' /* Function */
+
+/* The log format prefix for the format specifiers */
+#define LOG_FMT_PREFIX           '%'
+
 extern LogLevel g_log_level;
 
 void LOG(const LogLevel log_level, const char *file, const char *func,
@@ -58,9 +76,13 @@ void LOG_ERR(const LogLevel log_level, const char *file, const char *func,
 		const uint32_t line, const Error error_code, const char *fmt, ...) CHECK_PRINTF(6, 7);
 
 
-Error log_message(const LogLevel log_level, const char *file, const char *func,
-					const uint32_t line, const Error error_code, const char *message);
-
+static Error log_message_get_buffer(
+                    struct timeval *tval, int color, LogType type,
+                     char *buffer, size_t buffer_size,
+                     const char *log_format,
+                     const LogLevel log_level, const char *file,
+                     const char *function, const uint32_t line,
+                     const Error error_code, const char *message);
 #ifdef __cplusplus
 }
 #endif

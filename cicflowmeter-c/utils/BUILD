@@ -3,12 +3,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-	name = "debug-dep",
-	srcs = [
-		"debug.c",
-	],
-	hdrs = [
-		"debug.h",
-		"error.h",
-	],
+	name = "utils-dep",
+	srcs = glob(["*.c"]),
+	hdrs = glob(["*.h"]),
 )
