@@ -17,7 +17,7 @@ cc_test(
 	name = "tests",
 	srcs = glob(["**/*.cc"]),
 	deps = [
-		"//src/utils:debug-dep",
+		"//cicflowmeter-c/utils:debug-dep",
 		"//tests:tests-dep",
 		"@gtest//:gtest",
 		"@gtest//:gtest_main",

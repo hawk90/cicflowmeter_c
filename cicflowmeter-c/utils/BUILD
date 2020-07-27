@@ -12,11 +12,3 @@ cc_library(
 		"error.h",
 	],
 )
-
-#cc_binary(
-#	name = "debug",
-#	srcs = ["debug.c"],
-#	deps = [
-#		":debug-dep",
-#	],
-#)

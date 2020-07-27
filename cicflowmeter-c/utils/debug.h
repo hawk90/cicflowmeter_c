@@ -34,6 +34,11 @@ typedef enum {
     LOG_LEVEL_MAX,		/* */
 } LogLevel;
 
+typedef enum {
+	LOG_TYPE_STREAM	= 0,
+	LOG_TYPE_FILE,
+} LogType;
+
 /* The default log_format, if it is not supplied by the user */
 #define LOG_DEF_LOG_FORMAT_REL "%t - <%d> - "
 #define LOG_DEF_LOG_FORMAT_DEV "[%i] %t - (%f:%l) <%d> (%n) -- "
@@ -43,6 +48,7 @@ typedef enum {
 
 #define DEF_LOG_LEVEL LOG_INFO	/* The default log level, if it is not supplied by the user */
 
+#define DEF_LOG_TYPE LOG_TYPE_STREAM
 
 extern LogLevel g_log_level;
 
@@ -54,7 +60,6 @@ void LOG_ERR(const LogLevel log_level, const char *file, const char *func,
 
 Error LogMessage(const LogLevel log_level, const char *file, const char *func,
 					const uint32_t line, const Error error_code, const char *message);
-
 
 #ifdef __cplusplus
 }

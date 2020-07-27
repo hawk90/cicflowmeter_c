@@ -2,7 +2,7 @@
 #define _CICFLOWMETER_TEST_UTILS_DEBUG_
 
 extern "C" {
-	#include "src/utils/debug.h"
+	#include "cicflowmeter-c/utils/debug.h"
 }
 
 #endif
