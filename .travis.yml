@@ -14,3 +14,6 @@ before_install:
 
 script:
   bazel test //tests:tests
+
+after_success:
+  - codecov
