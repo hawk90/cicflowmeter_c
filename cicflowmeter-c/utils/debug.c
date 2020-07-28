@@ -264,6 +264,7 @@ ERROR_CODE print_log(const LOG_LEVEL log_level, const char *file, const char *fu
 		LOG_TYPE log_type;
 		FILE *fd;
 		pthread_mutex_t mutex;
+		uint32_t color;
 	} LOG_CONFIG;
 
 	LOG_CONFIG config;
@@ -278,6 +279,7 @@ ERROR_CODE print_log(const LOG_LEVEL log_level, const char *file, const char *fu
 	rt = gettimeofday(&tval, NULL);
 	if (rt != 0) goto error;
 
+	/* conf */
 	rt = get_fmt_log_message_buffer(&tval, buffer, sizeof(buffer), DEF_LOG_FORMAT_DEV, log_level, file, func, line, error_code, message);
 	if (rt != 0) goto error;
 

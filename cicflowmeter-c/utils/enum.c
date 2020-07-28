@@ -20,7 +20,7 @@ int get_map_value(const char *key, MAP *map)
     return result;
 
 error:
-//	LogDebug("Invalid argument(s) passed into SCMapEnumNameToValue");
+	LOG_DBG_MSG("Invalid argument(s) passed into get_map_value");
 	return -1;
 }
 
@@ -35,11 +35,11 @@ const char *get_map_key(int value, MAP *map)
         }
     }
 
-//    LogDebug("A enum by the value %d doesn't exist in this table", value);
+	LOG_DBG_MSG("A enum by the value %d doesn't exist in this map", value);
     return NULL;
 
 error:
-//	LogDebug("Invalid argument(s) passed into SCMapEnumValueToName");
+	LOG_DBG_MSG("Invalid argument(s) passed into get_map_key");
 	return NULL;
 
 }

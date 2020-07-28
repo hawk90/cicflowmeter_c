@@ -8,8 +8,17 @@ extern "C" {
 typedef enum {
 	ERROR_NONE = -1,
 	OK = 0,
-	EXIT,
+	/* warning */
+		/* */
+		/* */
+
+	/* error */
+		/* */
+		/* */
+	ERROR_EXIT,
 	ERROR_SPRINTF,
+
+	/* error max */
 	ERROR_CODE_MAX
 } ERROR_CODE;
 
