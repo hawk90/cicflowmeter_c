@@ -23,6 +23,7 @@ void hello_print()
 int main(int argc, char *argv[]) {
 	hello_print();
 
+	LOG_DBG_MSG("test");
 #if 0
 	int rc = 0;
 	const char *dev = "enp0s3";
@@ -48,5 +49,6 @@ int main(int argc, char *argv[]) {
 
 error:
 #endif
+
 	return -1;
 }

@@ -15,7 +15,7 @@ cc_binary(
 		"cicflowmeter.c",
 	],
 	deps = [
-		"//cicflowmeter-c/utils:debug-dep",
+		"//cicflowmeter-c/utils:utils-dep",
 		":cicflowmeter-dep",
 	],
 

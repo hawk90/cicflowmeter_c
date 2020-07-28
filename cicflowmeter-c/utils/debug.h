@@ -10,12 +10,6 @@ extern "C" {
 
 #include "error.h"
 
-struct timeval {
-  time_t      tv_sec;     /* seconds */
-  long        tv_usec;    /* microseconds */
-};
-
-
 #if defined __GNUC__
 #define CHECK_PRINTF(m,n) __attribute__((format(printf,m,n)))
 #else 
@@ -38,13 +32,13 @@ typedef enum {
     LOG_ALERT,			/* */
     LOG_EMERGENCY,		/* */
     LOG_LEVEL_MAX,		/* */
-} LogLevel;
+} LOG_LEVEL;
 
 typedef enum {
 	LOG_TYPE_STREAM	= 0,
 	LOG_TYPE_FILE,
 	LOG_TYPE_STREAM_AND_FILE,
-} LogType;	/* LogOPIface and LogOPType */
+} LOG_TYPE;	/* LogOPIface and LogOPType */
 
 
 #define MAX_LOG_MSG_LEN 2048		/* The maximum length of the log message */
@@ -77,32 +71,19 @@ typedef enum {
 #define LOG_FMT_FUNCTION         'n' /* Function */
 
 
-void log(const LogLevel log_level, const char *file, const char *func,
-		const uint32_t line, const ERROR_CODE error_code, const char *fmt, ...) CHECK_PRINTF(6, 7);
+void logger(const LOG_LEVEL log_level, const char *file, const char *func, const uint32_t line, const ERROR_CODE error_code, const char *fmt, ...) CHECK_PRINTF(6, 7);
 
-#define LOG_TRACE_MSG(...) log(LOG_TRACE, __FILE__, __func__, __LINE__, ERROR_NONE,  __VA_ARGS__)
-#define LOG_DBG_MSG(...) log(LOG_DEBUG, __FILE__, __func__, __LINE__, ERROR_NONE, __VA_ARGS__)
-#define LOG_INFO_MSG(...) log(LOG_INFO, __FILE__, __func__, __LINE__, ERROR_NONE, __VA_ARGS__)
-#define LOG_NOTI_MSG(...) log(LOG_NOTICE, __FILE__, __func__, __LINE__, ERROR_NONE, __VA_ARGS__)
-#define LOG_WARN_MSG(error_code, ...) log_err(LOG_WARNING, __FILE__, __func__, __LINE__, error_code,__VA_ARGS__)
-#define LOG_ERR_MSG(error_code, ...) log_err(LOG_ERROR, __FILE__, __func__, __LINE__, error_code,__VA_ARGS__)
-#define LOG_CRIT_MSG(error_code, ...) log_err(LOG_CRITICAL, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
-#define LOG_ALERT_MSG(error_code, ...) log(LOG_ALERT, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
-#define LOG_MERG_MSG(error_code, ...) log(LOG_EMERGENCY, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
+#define LOG_TRACE_MSG(...) logger(LOG_TRACE, __FILE__, __func__, __LINE__, ERROR_NONE,  __VA_ARGS__)
+#define LOG_DBG_MSG(...) logger(LOG_DEBUG, __FILE__, __func__, __LINE__, ERROR_NONE, __VA_ARGS__)
+#define LOG_INFO_MSG(...) logger(LOG_INFO, __FILE__, __func__, __LINE__, ERROR_NONE, __VA_ARGS__)
+#define LOG_NOTI_MSG(...) logger(LOG_NOTICE, __FILE__, __func__, __LINE__, ERROR_NONE, __VA_ARGS__)
+#define LOG_WARN_MSG(error_code, ...) logger(LOG_WARNING, __FILE__, __func__, __LINE__, error_code,__VA_ARGS__)
+#define LOG_ERR_MSG(error_code, ...) logger(LOG_ERROR, __FILE__, __func__, __LINE__, error_code,__VA_ARGS__)
+#define LOG_CRIT_MSG(error_code, ...) logger(LOG_CRITICAL, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
+#define LOG_ALERT_MSG(error_code, ...) logger(LOG_ALERT, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
+#define LOG_MERG_MSG(error_code, ...) logger(LOG_EMERGENCY, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
 
-
-
-static ERROR_CODE get_log_message_buffer(
-                    struct timeval *tval, int color, LogType type,
-                     char *buffer, size_t buffer_size,
-                     const char *log_format,
-                     const LogLevel log_level, const char *file,
-                     const char *function, const uint32_t line,
-                     const ERROR_CODE error_code, const char *message);
-
-ERROR_CODE log_message(const LogLevel log_level, const char *file, const char *func, const uint32_t line, ERROR_CODE error_code, const char *message)
-
-extern LogLevel g_log_level;
+extern LOG_LEVEL g_log_level;
 
 #ifdef __cplusplus
 }
