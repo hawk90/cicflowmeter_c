@@ -2,7 +2,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <sys/time.h>
-
+#include <pthread.h>
 #include "debug.h"
 #include "enum.h"
 
@@ -240,7 +240,6 @@ error:
 	return ERROR_SPRINTF;
 }
 
-/*
 static inline int flush_log_buffer(FILE *fd, const char *msg)
 {
 	int rt = 0;
@@ -258,23 +257,49 @@ static inline int flush_log_buffer(FILE *fd, const char *msg)
 error:
 	return -1;
 }
-*/
 
 ERROR_CODE print_log(const LOG_LEVEL log_level, const char *file, const char *func, const uint32_t line, ERROR_CODE error_code, const char *message)
 {	
+	typedef struct LOG_CONFIG_ {
+		LOG_TYPE log_type;
+		FILE *fd;
+		pthread_mutex_t mutex;
+	} LOG_CONFIG;
+
+	LOG_CONFIG config;
+	config.log_type = LOG_TYPE_FILE;
+	config.fd = NULL;
+	pthread_mutex_init(&(config.mutex), NULL);
+
 	char buffer[MAX_LOG_MSG_LEN] = "";
 	struct timeval tval;
 	int rt = 0;
 		
 	rt = gettimeofday(&tval, NULL);
-	if (rt != 0 ) goto error;
+	if (rt != 0) goto error;
 
-	get_fmt_log_message_buffer(&tval, buffer, sizeof(buffer), DEF_LOG_FORMAT_DEV, log_level, file, func, line, error_code, message);
+	rt = get_fmt_log_message_buffer(&tval, buffer, sizeof(buffer), DEF_LOG_FORMAT_DEV, log_level, file, func, line, error_code, message);
+	if (rt != 0) goto error;
 
-	printf("+++++++++++++++++++++++++++++++++++++++\n");
-	printf("%s\n", buffer);
-	printf("+++++++++++++++++++++++++++++++++++++++\n");
+	switch (config.log_type) {
+		case LOG_TYPE_STREAM:
+			flush_log_buffer(stdout, buffer);
+			break;
+		case LOG_TYPE_FILE:
+			pthread_mutex_lock(&(config.mutex));
 
+			/* Ciritical Session */
+			config.fd = fopen("cicflowmeter", "a");
+			flush_log_buffer(config.fd, buffer);
+			fclose(config.fd);
+
+			pthread_mutex_unlock(&(config.mutex));
+			break;
+		case LOG_TYPE_STREAM_AND_FILE:
+			break;
+		default:
+			goto error;
+	}
 error:
 	return OK;
 }
