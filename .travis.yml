@@ -14,10 +14,11 @@ before_install:
   - sudo dpkg -i bazel_3.4.1-linux-x86_64.deb
 
 script:
-  - bazel build //cicflowmeter-c:cicflowmeter
-  - bazel test //cicflowmeter-c:cicflowmeter
-#  bazel coverage //cicflowmeter-c:cicflowmeter
+  - bazel test //tests:tests
+#  - bazel build //cicflowmeter-c:cicflowmeter
+#  - bazel test //cicflowmeter-c:cicflowmeter
+#  - bazel coverage //cicflowmeter-c:cicflowmeter
 
 after_success:
-  - cat bazel-testlogs/cicflowmeter-c/cicflowmeter/baseline_coverage.dat
+#  - cat bazel-testlogs/cicflowmeter-c/cicflowmeter/baseline_coverage.dat
   - bash <(curl -s https://codecov.io/bash)
