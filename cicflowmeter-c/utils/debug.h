@@ -15,7 +15,7 @@ struct timeval {
   long        tv_usec;    /* microseconds */
 };
 
-// TODO: goto common.h and what is means?
+
 #if defined __GNUC__
 #define CHECK_PRINTF(m,n) __attribute__((format(printf,m,n)))
 #else 
@@ -43,18 +43,29 @@ typedef enum {
 typedef enum {
 	LOG_TYPE_STREAM	= 0,
 	LOG_TYPE_FILE,
-} LogType;
+	LOG_TYPE_STREAM_AND_FILE,
+} LogType;	/* LogOPIface and LogOPType */
 
-/* The default log_format, if it is not supplied by the user */
-#define LOG_DEF_LOG_FORMAT_REL "%t - <%d> - "
-#define LOG_DEF_LOG_FORMAT_DEV "[%i] %t - (%f:%l) <%d> (%n) -- "
 
-#define MAX_LOG_MSG_LEN 2048	/* The maximum length of the log message */
-#define MAX_LOG_FORMAT_LEN 128	/* The maximum length of the log format */
+#define MAX_LOG_MSG_LEN 2048		/* The maximum length of the log message */
+#define MAX_LOG_FORMAT_LEN 128		/* The maximum length of the log format */
 
-#define DEF_LOG_LEVEL LOG_INFO	/* The default log level, if it is not supplied by the user */
+/**
+*	Default and format
+*/
+/* The default log_format, relase and devlop */
+#define DEF_LOG_LEVEL LOG_INFO
 
-#define DEF_LOG_TYPE LOG_TYPE_STREAM
+#define DEF_LOG_TYPE LOG_TYPE_STREAM_AND_FILE
+
+#define DEFLOG_FILE "cicflowmeter.log"
+
+#define DEF_LOG_FORMAT_REL "%t - <%d> - "
+//#define DEF_LOG_FORMAT_DEV "[%i] %t - (%f:%l) <%d> (%n) -- "
+#define DEF_LOG_FORMAT_DEV "%t - (%f:%l) <%d> (%n) -- "
+
+/* The log format prefix for the format specifiers */
+#define LOG_FMT_PREFIX           '%'
 
 #define LOG_FMT_TIME             't' /* Timestamp in standard format */
 #define LOG_FMT_PID              'p' /* PID */
@@ -65,24 +76,34 @@ typedef enum {
 #define LOG_FMT_LINE             'l' /* Line number */
 #define LOG_FMT_FUNCTION         'n' /* Function */
 
-/* The log format prefix for the format specifiers */
-#define LOG_FMT_PREFIX           '%'
 
-extern LogLevel g_log_level;
+void log(const LogLevel log_level, const char *file, const char *func,
+		const uint32_t line, const ERROR_CODE error_code, const char *fmt, ...) CHECK_PRINTF(6, 7);
 
-void LOG(const LogLevel log_level, const char *file, const char *func,
-			const uint32_t line, const char *fmt, ...) CHECK_PRINTF(5,6);
-void LOG_ERR(const LogLevel log_level, const char *file, const char *func,
-		const uint32_t line, const Error error_code, const char *fmt, ...) CHECK_PRINTF(6, 7);
+#define LOG_TRACE_MSG(...) log(LOG_TRACE, __FILE__, __func__, __LINE__, ERROR_NONE,  __VA_ARGS__)
+#define LOG_DBG_MSG(...) log(LOG_DEBUG, __FILE__, __func__, __LINE__, ERROR_NONE, __VA_ARGS__)
+#define LOG_INFO_MSG(...) log(LOG_INFO, __FILE__, __func__, __LINE__, ERROR_NONE, __VA_ARGS__)
+#define LOG_NOTI_MSG(...) log(LOG_NOTICE, __FILE__, __func__, __LINE__, ERROR_NONE, __VA_ARGS__)
+#define LOG_WARN_MSG(error_code, ...) log_err(LOG_WARNING, __FILE__, __func__, __LINE__, error_code,__VA_ARGS__)
+#define LOG_ERR_MSG(error_code, ...) log_err(LOG_ERROR, __FILE__, __func__, __LINE__, error_code,__VA_ARGS__)
+#define LOG_CRIT_MSG(error_code, ...) log_err(LOG_CRITICAL, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
+#define LOG_ALERT_MSG(error_code, ...) log(LOG_ALERT, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
+#define LOG_MERG_MSG(error_code, ...) log(LOG_EMERGENCY, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
 
 
-static Error log_message_get_buffer(
+
+static ERROR_CODE get_log_message_buffer(
                     struct timeval *tval, int color, LogType type,
                      char *buffer, size_t buffer_size,
                      const char *log_format,
                      const LogLevel log_level, const char *file,
                      const char *function, const uint32_t line,
-                     const Error error_code, const char *message);
+                     const ERROR_CODE error_code, const char *message);
+
+ERROR_CODE log_message(const LogLevel log_level, const char *file, const char *func, const uint32_t line, ERROR_CODE error_code, const char *message)
+
+extern LogLevel g_log_level;
+
 #ifdef __cplusplus
 }
 #endif

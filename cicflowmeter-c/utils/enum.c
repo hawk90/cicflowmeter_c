@@ -4,7 +4,7 @@
 #include "enum.h"
 #include "debug.h"
 
-int enum_key_to_value(const char *key, EnumCharMap *map)
+int get_map_value(const char *key, EnumCharMap *map)
 {
     int result = -1;
 
@@ -25,7 +25,7 @@ error:
 }
 
 
-const char *enum_value_to_key(int value, EnumCharMap *map)
+const char *get_map_key(int value, EnumCharMap *map)
 {
     if (map == NULL) goto error;
 

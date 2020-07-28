@@ -6,14 +6,15 @@ extern "C" {
 #endif
 
 typedef enum {
-	OK,
+	ERROR_NONE = -1,
+	OK = 0,
 	EXIT,
 	ERROR_SPRINTF,
 	ERROR_CODE_MAX
-} Error;
+} ERROR_CODE;
 
 
-const char *error_to_string(Error error_code);
+const char *error_to_string(ERROR_CODE error_code);
 #ifdef __cplusplus
 }
 #endif

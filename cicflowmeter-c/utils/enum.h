@@ -5,14 +5,13 @@
 extern "C" {
 #endif
 
-typedef struct EnumCharMap_ {
+typedef struct MAP_ {
     const char *key;
     int value;
-} EnumCharMap;
+} MAP;
 
-int enum_key_to_value(const char *key, EnumCharMap *map);
-
-const char * enum_value_to_key(int value, EnumCharMap *map);
+int get_map_value(const char *key, MAP *map);
+const char * get_map_key(int value, MAP *map);
 
 #ifdef __cplusplus
 }
