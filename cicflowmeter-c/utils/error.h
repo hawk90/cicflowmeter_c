@@ -15,6 +15,7 @@ typedef enum {
 	/* error */
 		/* */
 		/* */
+	ERROR_INVALID_VALUE,
 	ERROR_EXIT,
 	ERROR_SPRINTF,
 

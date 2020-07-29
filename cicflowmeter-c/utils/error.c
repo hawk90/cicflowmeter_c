@@ -8,6 +8,7 @@ const char *error_to_string(ERROR_CODE error_code)
 		ERROR_CASE (ERROR_NONE);
         ERROR_CASE (OK);
 
+		ERROR_CASE (ERROR_INVALID_VALUE);
 		ERROR_CASE (ERROR_EXIT);
 		ERROR_CASE (ERROR_SPRINTF);
 
