@@ -22,6 +22,14 @@ MAP g_log_level_map[ ] = {
     { NULL,             -1 }
 };
 
+typedef struct LOG_CONFIG_ {
+	LOG_TYPE log_type;
+	FILE *fd;
+	pthread_mutex_t mutex;
+	uint32_t color;
+} LOG_CONFIG;
+
+static LOG_CONFIG g_log_config;
 
 /**
  * \brief Adds the global log_format to the outgoing buffer
@@ -260,22 +268,11 @@ error:
 
 ERROR_CODE print_log(const LOG_LEVEL log_level, const char *file, const char *func, const uint32_t line, ERROR_CODE error_code, const char *message)
 {	
-	typedef struct LOG_CONFIG_ {
-		LOG_TYPE log_type;
-		FILE *fd;
-		pthread_mutex_t mutex;
-		uint32_t color;
-	} LOG_CONFIG;
-
-	LOG_CONFIG config;
-	config.log_type = LOG_TYPE_FILE;
-	config.fd = NULL;
-	pthread_mutex_init(&(config.mutex), NULL);
-
 	char buffer[MAX_LOG_MSG_LEN] = "";
 	struct timeval tval;
 	int rt = 0;
-		
+	
+
 	rt = gettimeofday(&tval, NULL);
 	if (rt != 0) goto error;
 
@@ -283,19 +280,19 @@ ERROR_CODE print_log(const LOG_LEVEL log_level, const char *file, const char *fu
 	rt = get_fmt_log_message_buffer(&tval, buffer, sizeof(buffer), DEF_LOG_FORMAT_DEV, log_level, file, func, line, error_code, message);
 	if (rt != 0) goto error;
 
-	switch (config.log_type) {
+	switch (g_log_config.log_type) {
 		case LOG_TYPE_STREAM:
 			flush_log_buffer(stdout, buffer);
 			break;
 		case LOG_TYPE_FILE:
-			pthread_mutex_lock(&(config.mutex));
+			pthread_mutex_lock(&(g_log_config.mutex));
 
 			/* Ciritical Session */
-			config.fd = fopen("cicflowmeter", "a");
-			flush_log_buffer(config.fd, buffer);
-			fclose(config.fd);
+			g_log_config.fd = fopen("cicflowmeter", "a");
+			flush_log_buffer(g_log_config.fd, buffer);
+			fclose(g_log_config.fd);
 
-			pthread_mutex_unlock(&(config.mutex));
+			pthread_mutex_unlock(&(g_log_config.mutex));
 			break;
 		case LOG_TYPE_STREAM_AND_FILE:
 			break;
@@ -320,4 +317,11 @@ void logger(const LOG_LEVEL log_level, const char *file, const char *func,
 		print_log(log_level, file, func, line, error_code, msg);
 	}
 
+}
+
+int init_log_config()
+{
+	g_log_config.log_type = LOG_TYPE_STREAM;
+	g_log_config.fd = NULL;
+	pthread_mutex_init(&(g_log_config.mutex), NULL);
 }
