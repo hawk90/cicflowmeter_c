@@ -22,14 +22,14 @@ MAP g_log_level_map[ ] = {
     { NULL,             -1 }
 };
 
-typedef struct LOG_CONFIG_ {
+struct LOG_CONFIG {
 	LOG_TYPE log_type;
 	FILE *fd;
 	pthread_mutex_t mutex;
 	uint32_t color;
-} LOG_CONFIG;
+} ;
 
-static LOG_CONFIG g_log_config;
+static struct LOG_CONFIG g_log_config;
 
 /**
  * \brief Adds the global log_format to the outgoing buffer
@@ -324,4 +324,6 @@ int init_log_config()
 	g_log_config.log_type = LOG_TYPE_STREAM;
 	g_log_config.fd = NULL;
 	pthread_mutex_init(&(g_log_config.mutex), NULL);
+
+	return 0;
 }
