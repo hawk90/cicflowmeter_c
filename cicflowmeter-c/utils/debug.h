@@ -5,9 +5,7 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
-#include <time.h>
-
+#include "enum.h"
 #include "error.h"
 
 #if defined __GNUC__

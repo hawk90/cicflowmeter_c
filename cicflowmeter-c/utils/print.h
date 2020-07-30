@@ -1,10 +1,6 @@
 #ifndef __CICFLOWMETER_UTILS_PRINT_H__
 #define __CICFLOWMETER_UTILS_PRINT_H__
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <inttypes.h>
-
 #include "debug.h"
 
 #define DUMP(buffer, buffer_offset_ptr, buffer_size, ...) do {					\

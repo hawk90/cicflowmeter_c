@@ -1,4 +1,6 @@
-#include <stdio.h>
+#ifndef __CICFLOWMETER_UTILS_ATOMIC_H__
+#define __CICFLOWMETER_UTILS_ATOMIC_H__
+
 #include <stdatomic.h>
 
 #define ATOMIC_DECLARE(type, name) \
@@ -97,3 +99,4 @@
 #define ATOMIC_SET(name, val)    \
     atomic_store(&(name ## __atomic__), (val))
 
+#endif

@@ -1,7 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
-package(default_visibility = ["//visibility:public"])
-
 cc_library(
 	name = "cicflowmeter-dep",
 	hdrs = [
@@ -16,6 +14,7 @@ cc_binary(
 	],
 	deps = [
 		"//cicflowmeter-c/utils:utils-dep",
+		"//cicflowmeter-c/common:common-dep",
 		":cicflowmeter-dep",
 	],
 

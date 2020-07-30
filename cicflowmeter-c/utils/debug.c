@@ -1,10 +1,6 @@
-#include <stdio.h>
-#include <stdarg.h>
-#include <string.h>
-#include <sys/time.h>
-#include <pthread.h>
+#include "cicflowmeter-c/common/cicflowmeter-common.h"
+
 #include "debug.h"
-#include "enum.h"
 
 MAP g_log_level_map[ ] = {
     { "Not set",        LOG_NOTSET},

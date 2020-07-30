@@ -1,5 +1,4 @@
-#include <stddef.h>
-#include <strings.h>
+#include "cicflowmeter-c/common/cicflowmeter-common.h"
 
 #include "enum.h"
 #include "debug.h"

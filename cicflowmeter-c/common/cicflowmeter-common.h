@@ -7,78 +7,34 @@
 #define _GNU_SOURCE
 #define __USE_GNU
 
-#if HAVE_CONFIG_H
-#include <config.h>
-#endif
-
 #ifndef CLS
-#warning "L1 cache line size not detected during build. Assuming 64 bytes."
 #define CLS 64
 #endif
 
-#if HAVE_DIRENT_H
 #include <dirent.h>
-#endif
-
-#if HAVE_STDIO_H
 #include <stdio.h>
-#endif
-
-#if HAVE_STDDEF_H
 #include <stddef.h>
-#endif
-
-#if HAVE_STDINT_h
 #include <stdint.h>
-#endif
-
-#if HAVE_STDBOOL_H
 #include <stdbool.h>
-#endif
-
-#if HAVE_STDARG_H
 #include <stdarg.h>
-#endif
-
-#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
-#endif
-
-#if HAVE_ERRNO_H
 #include <errno.h>
-#endif
-
-#if HAVE_UNISTD_H
 #include <unistd.h>
-#endif
-
-#if HAVE_INTTYPES_H
 #include <inttypes.h>
-#endif
 
 #if HAVE_LIMITS_H
 #include <limits.h>
 #endif
 
-#if HAVE_CTYPE_H
 #include <ctype.h>
-#endif
-
-#if HAVE_STRING_H
 #include <string.h>
-#endif
-
-#if HAVE_STRINGS_H
 #include <strings.h>
-#endif
 
 #if HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
 
-#ifdef HAVE_TIME_H
 #include <time.h>
-#endif
 
 #if HAVE_SYS_SYSCALL_H
 #include <sys/syscall.h>
@@ -146,23 +102,14 @@ typedef unsigned char u_char
 #include <netinet/in.h>
 #endif
 
-#if HAVE_ARPA_INET_H
 #include <arpa/inet.h>
-#endif
 
 #if HAVE_NETDB_H
 #include <netdb.h>
 #endif
 
-#ifndef SC_PCAP_DONT_INCLUDE_PCAP_H
-#ifdef HAVE_PCAP_H
 #include <pcap.h>
-#endif
-
-#ifdef HAVE_PCAP_PCAP_H
 #include <pcap/pcap.h>
-#endif
-#endif
 
 #ifdef HAVE_UTIME_H
 #include <utime.h>
@@ -387,9 +334,10 @@ char *strptime(const char * __restrict, const char * __restrict, struct tm * __r
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
+#include <pthread.h>
+
 #ifndef NAME_MAX
 #define NAME_MAX 255
-
 #endif
 
 #endif
