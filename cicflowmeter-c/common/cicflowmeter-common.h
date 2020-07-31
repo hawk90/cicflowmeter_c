@@ -98,9 +98,7 @@ typedef unsigned char u_char
 #include <sys/random.h>
 #endif
 
-#if HAVE_NETINET_IN_H
 #include <netinet/in.h>
-#endif
 
 #include <arpa/inet.h>
 
@@ -108,7 +106,7 @@ typedef unsigned char u_char
 #include <netdb.h>
 #endif
 
-#include <pcap/pcap.h>
+#include <pcap.h>
 
 #ifdef HAVE_UTIME_H
 #include <utime.h>
