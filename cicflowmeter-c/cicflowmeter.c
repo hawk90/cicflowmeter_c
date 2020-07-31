@@ -1,10 +1,6 @@
-#include <stdio.h>
-#include <time.h>
-#include <pcap/pcap.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <netinet/if_ether.h>
 
+#include "common/cicflowmeter-common.h"
 #include "utils/debug.h"
 
 #define NEXT_EX_OK 1

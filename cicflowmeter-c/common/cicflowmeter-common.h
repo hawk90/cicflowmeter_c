@@ -108,7 +108,6 @@ typedef unsigned char u_char
 #include <netdb.h>
 #endif
 
-#include <pcap.h>
 #include <pcap/pcap.h>
 
 #ifdef HAVE_UTIME_H
