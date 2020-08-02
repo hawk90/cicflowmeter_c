@@ -6,8 +6,8 @@
 #define FLOW_QUIET      TRUE
 #define FLOW_VERBOSE    FALSE
 
-#define TOSERVER 0
-#define TOCLIENT 1
+#define TO_SERVER 0
+#define TO_CLIENT 1
 
 /* per flow flags */
 
@@ -19,27 +19,27 @@
 #define FLOW_TCP_REUSED                 BIT_U32(2)
 
 /** Flow was inspected against IP-Only sigs in the toserver direction */
-#define FLOW_TOSERVER_IPONLY_SET        BIT_U32(3)
+#define FLOW_TO_SERVER_IP_ONLY_SET        BIT_U32(3)
 /** Flow was inspected against IP-Only sigs in the toclient direction */
-#define FLOW_TOCLIENT_IPONLY_SET        BIT_U32(4)
+#define FLOW_TO_CLIENT_IP_ONLY_SET        BIT_U32(4)
 
 /** Packet belonging to this flow should not be inspected at all */
-#define FLOW_NOPACKET_INSPECTION        BIT_U32(5)
+#define FLOW_NO_PACKET_INSPECTION        BIT_U32(5)
 /** Packet payloads belonging to this flow should not be inspected */
-#define FLOW_NOPAYLOAD_INSPECTION       BIT_U32(6)
+#define FLOW_NO_PAYLOAD_INSPECTION       BIT_U32(6)
 
 /** All packets in this flow should be dropped */
 #define FLOW_ACTION_DROP                BIT_U32(7)
 
 /** Sgh for toserver direction set (even if it's NULL) */
-#define FLOW_SGH_TOSERVER               BIT_U32(8)
+#define FLOW_SGH_TO_SERVER               BIT_U32(8)
 /** Sgh for toclient direction set (even if it's NULL) */
-#define FLOW_SGH_TOCLIENT               BIT_U32(9)
+#define FLOW_SGH_TO_CLIENT               BIT_U32(9)
 
 /** packet to server direction has been logged in drop file (only in IPS mode) */
-#define FLOW_TOSERVER_DROP_LOGGED       BIT_U32(10)
+#define FLOW_TO_SERVER_DROP_LOGGED       BIT_U32(10)
 /** packet to client direction has been logged in drop file (only in IPS mode) */
-#define FLOW_TOCLIENT_DROP_LOGGED       BIT_U32(11)
+#define FLOW_TO_CLIENT_DROP_LOGGED       BIT_U32(11)
 
 /** flow has alerts */
 #define FLOW_HAS_ALERTS                 BIT_U32(12)
@@ -77,44 +77,44 @@
 
 /* File flags */
 
-#define FLOWFILE_INIT                   0
+#define FLOW_FILE_INIT                   0
 
 /** no magic on files in this flow */
-#define FLOWFILE_NO_MAGIC_TS            BIT_U16(0)
-#define FLOWFILE_NO_MAGIC_TC            BIT_U16(1)
+#define FLOW_FILE_NO_MAGIC_TS            BIT_U16(0)
+#define FLOW_FILE_NO_MAGIC_TC            BIT_U16(1)
 
 /** even if the flow has files, don't store 'm */
-#define FLOWFILE_NO_STORE_TS            BIT_U16(2)
-#define FLOWFILE_NO_STORE_TC            BIT_U16(3)
+#define FLOW_FILE_NO_STORE_TS            BIT_U16(2)
+#define FLOW_FILE_NO_STORE_TC            BIT_U16(3)
 /** no md5 on files in this flow */
-#define FLOWFILE_NO_MD5_TS              BIT_U16(4)
-#define FLOWFILE_NO_MD5_TC              BIT_U16(5)
+#define FLOW_FILE_NO_MD5_TS              BIT_U16(4)
+#define FLOW_FILE_NO_MD5_TC              BIT_U16(5)
 
 /** no sha1 on files in this flow */
-#define FLOWFILE_NO_SHA1_TS             BIT_U16(6)
-#define FLOWFILE_NO_SHA1_TC             BIT_U16(7)
+#define FLOW_FILE_NO_SHA1_TS             BIT_U16(6)
+#define FLOW_FILE_NO_SHA1_TC             BIT_U16(7)
 
 /** no sha256 on files in this flow */
-#define FLOWFILE_NO_SHA256_TS           BIT_U16(8)
-#define FLOWFILE_NO_SHA256_TC           BIT_U16(9)
+#define FLOW_FILE_NO_SHA256_TS           BIT_U16(8)
+#define FLOW_FILE_NO_SHA256_TC           BIT_U16(9)
 
 /** no size tracking of files in this flow */
-#define FLOWFILE_NO_SIZE_TS             BIT_U16(10)
-#define FLOWFILE_NO_SIZE_TC             BIT_U16(11)
+#define FLOW_FILE_NO_SIZE_TS             BIT_U16(10)
+#define FLOW_FILE_NO_SIZE_TC             BIT_U16(11)
 
-#define FLOWFILE_NONE_TS (FLOWFILE_NO_MAGIC_TS | \
-                          FLOWFILE_NO_STORE_TS | \
-                          FLOWFILE_NO_MD5_TS   | \
-                          FLOWFILE_NO_SHA1_TS  | \
-                          FLOWFILE_NO_SHA256_TS| \
-                          FLOWFILE_NO_SIZE_TS)
-#define FLOWFILE_NONE_TC (FLOWFILE_NO_MAGIC_TC | \
-                          FLOWFILE_NO_STORE_TC | \
-                          FLOWFILE_NO_MD5_TC   | \
-                          FLOWFILE_NO_SHA1_TC  | \
-                          FLOWFILE_NO_SHA256_TC| \
-                          FLOWFILE_NO_SIZE_TC)
-#define FLOWFILE_NONE    (FLOWFILE_NONE_TS|FLOWFILE_NONE_TC)
+#define FLOW_FILE_NONE_TS (FLOW_FILE_NO_MAGIC_TS | \
+                          FLOW_FILE_NO_STORE_TS | \
+                          FLOW_FILE_NO_MD5_TS   | \
+                          FLOW_FILE_NO_SHA1_TS  | \
+                          FLOW_FILE_NO_SHA256_TS| \
+                          FLOW_FILE_NO_SIZE_TS)
+#define FLOW_FILE_NONE_TC (FLOW_FILE_NO_MAGIC_TC | \
+                          FLOW_FILE_NO_STORE_TC | \
+                          FLOW_FILE_NO_MD5_TC   | \
+                          FLOW_FILE_NO_SHA1_TC  | \
+                          FLOW_FILE_NO_SHA256_TC| \
+                          FLOW_FILE_NO_SIZE_TC)
+#define FLOW_FILE_NONE    (FLOW_FILE_NONE_TS|FLOW_FILE_NONE_TC)
 
 #define FLOW_IS_IPV4(f) \
     (((f)->flags & FLOW_IPV4) == FLOW_IPV4)

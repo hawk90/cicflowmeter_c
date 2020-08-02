@@ -6,15 +6,14 @@
 
 /* in utils dir*/
 
+#define DEF_FLOW_EMER_RECOVERY	30
+#define DEF_FLOW_HASH_SIZE		66536
+#define DEF_FLOW_MEM_SIZE		(32 * 1024 * 1024)	/* 32MB */
+#define DEF_FLOW_ALLOC			10000
 
-#define FLOW_DEF_EMER_RECOVERY	30
-#define FLOW DEF_HASH_SIZE		66536
-#define FLOW_DEF_MEM_SIZE		(32 * 1024 * 1024)	/* 32MB */
-#define FLOW_DEF_PRE_ALLOC		10000
-
-ATOMIC_DECLARE(uint32_t, flow_prune_idx);
-ATOMIC_DECLARE(uint32_t, flow_flags);
-ATOMIC_DECLARE(uint64_t, flow_mem_use);
+ATOMIC_DECLARE(uint32_t, g_flow_prune_idx);
+ATOMIC_DECLARE(uint32_t, g_flow_flags);
+ATOMIC_DECLARE(uint64_t, g_flow_mem_use);
 
 FLOW_PROTO_TIMEOUT g_flow_timeouts_normal[FLOW_PROTO_MAX];
 FLOW_PROTO_TIMEOUT g_flow_timeouts_emer[FLOW_PROTO_MAX];
@@ -28,10 +27,10 @@ FLOW_CONFIG g_flow_config;
  *
  *  \param size new memcap value
  */
-int FlowSetMemcap(uint64_t size)
+int set_flow_mem_cap(uint64_t size)
 {
-    if ((uint64_t)SC_ATOMIC_GET(flow_memuse) < size) {
-        SC_ATOMIC_SET(flow_config.memcap, size);
+    if ((uint64_t)ATOMIC_GET(g_flow_mem_use) < size) {
+        ATOMIC_SET(g_flow_config.mem_cap, size);
         return 1;
     }
 
@@ -43,19 +42,19 @@ int FlowSetMemcap(uint64_t size)
  *
  *  \retval memcap value
  */
-uint64_t FlowGetMemcap(void)
+uint64_t get_flow_mem_cap(void)
 {
-    uint64_t memcapcopy = SC_ATOMIC_GET(flow_config.memcap);
-    return memcapcopy;
+    uint64_t mem_cap = ATOMIC_GET(g_flow_config.mem_cap);
+    return mem_cap;
 }
 
-uint64_t FlowGetMemuse(void)
+uint64_t get_flow_mem_use(void)
 {
-    uint64_t memusecopy = SC_ATOMIC_GET(flow_memuse);
-    return memusecopy;
+    uint64_t mem_use = ATOMIC_GET(g_flow_mem_use);
+    return mem_use;
 }
 
-void FlowCleanupAppLayer(Flow *f)
+void FLOWCleanupAppLayer(FLOW *f)
 {
     if (f == NULL || f->proto == 0)
         return;
@@ -74,37 +73,37 @@ void FlowCleanupAppLayer(Flow *f)
  *  \retval 1 if the queue was properly updated (or if it already was in good shape)
  *  \retval 0 otherwise.
  */
-int FlowUpdateSpareFlows(void)
+int update_spare_flows(void)
 {
-    SCEnter();
-    uint32_t toalloc = 0, tofree = 0, len;
+    Enter();
+    uint32_t to_alloc = 0, to_free = 0, len = 0;
+	uint32_t i = 0;
+	FLOW *f = NULL;
 
-    FQLOCK_LOCK(&flow_spare_q);
-    len = flow_spare_q.len;
-    FQLOCK_UNLOCK(&flow_spare_q);
+    FQLOCK_LOCK(&g_flow_queue);
+    len = flow_queue.len;
+    FQLOCK_UNLOCK(&flow_queue);
 
-    if (len < flow_config.prealloc) {
-        toalloc = flow_config.prealloc - len;
+    if (len < g_flow_config.pre_alloc) {
+        to_alloc = g_flow_config.pre_alloc - len;
 
-        uint32_t i;
-        for (i = 0; i < toalloc; i++) {
-            Flow *f = FlowAlloc();
+        for (i = 0; i < to_alloc; i++) {
+            f = alloc_flow();
             if (f == NULL)
                 return 0;
 
-            FlowEnqueue(&flow_spare_q,f);
+            enqueue_flow(&g_flow_queue, f);
         }
-    } else if (len > flow_config.prealloc) {
-        tofree = len - flow_config.prealloc;
+    } else if (len > g_flow_config.pre_alloc) {
+        to_free = len - g_flow_config.pre_alloc;
 
-        uint32_t i;
-        for (i = 0; i < tofree; i++) {
-            /* FlowDequeue locks the queue */
-            Flow *f = FlowDequeue(&flow_spare_q);
+        for (i = 0; i < to_free; i++) {
+            /* FLOWDequeue locks the queue */
+            f = dequeue_flow(&g_flow_queue);
             if (f == NULL)
                 return 1;
 
-            FlowFree(f);
+            free_flow(f);
         }
     }
 
@@ -113,10 +112,10 @@ int FlowUpdateSpareFlows(void)
 
 /** \brief Set the IPOnly scanned flag for 'direction'.
   *
-  * \param f Flow to set the flag in
+  * \param f FLOW to set the flag in
   * \param direction direction to set the flag in
   */
-void FlowSetIPOnlyFlag(Flow *f, int direction)
+void set_ip_only_flag(FLOW *f, int direction)
 {
     direction ? (f->flags |= FLOW_TOSERVER_IPONLY_SET) :
         (f->flags |= FLOW_TOCLIENT_IPONLY_SET);
@@ -127,7 +126,7 @@ void FlowSetIPOnlyFlag(Flow *f, int direction)
  *
  * \param f flow
  */
-void FlowSetHasAlertsFlag(Flow *f)
+void set_has_alerts_flag(FLOW *f)
 {
     f->flags |= FLOW_HAS_ALERTS;
 }
@@ -138,7 +137,7 @@ void FlowSetHasAlertsFlag(Flow *f)
  * \retval 1 has alerts
  * \retval 0 has not alerts
  */
-int FlowHasAlerts(const Flow *f)
+int has_flow_alerts(const FLOW *f)
 {
     if (f->flags & FLOW_HAS_ALERTS) {
         return 1;
@@ -151,7 +150,7 @@ int FlowHasAlerts(const Flow *f)
  *
  * \param f flow
  */
-void FlowSetChangeProtoFlag(Flow *f)
+void set_change_proto_flag(FLOW *f)
 {
     f->flags |= FLOW_CHANGE_PROTO;
 }
@@ -160,7 +159,7 @@ void FlowSetChangeProtoFlag(Flow *f)
  *
  * \param f flow
  */
-void FlowUnsetChangeProtoFlag(Flow *f)
+void unset_change_proto_flag(FLOW *f)
 {
     f->flags &= ~FLOW_CHANGE_PROTO;
 }
@@ -170,7 +169,7 @@ void FlowUnsetChangeProtoFlag(Flow *f)
  * \retval 1 change proto flag is set
  * \retval 0 change proto flag is not set
  */
-int FlowChangeProto(Flow *f)
+int has_flow_change_Proto(FLOW *f)
 {
     if (f->flags & FLOW_CHANGE_PROTO) {
         return 1;
@@ -179,7 +178,7 @@ int FlowChangeProto(Flow *f)
     return 0;
 }
 
-static inline void FlowSwapFlags(Flow *f)
+static inline void swap_flow_flags(FLOW *f)
 {
     SWAP_FLAGS(f->flags, FLOW_TO_SRC_SEEN, FLOW_TO_DST_SEEN);
     SWAP_FLAGS(f->flags, FLOW_TOSERVER_IPONLY_SET, FLOW_TOCLIENT_IPONLY_SET);
@@ -193,7 +192,7 @@ static inline void FlowSwapFlags(Flow *f)
     SWAP_FLAGS(f->flags, FLOW_PROTO_DETECT_TS_DONE, FLOW_PROTO_DETECT_TC_DONE);
 }
 
-static inline void FlowSwapFileFlags(Flow *f)
+static inline void swap_flow_file_flags(FLOW *f)
 {
     SWAP_FLAGS(f->file_flags, FLOWFILE_NO_MAGIC_TS, FLOWFILE_NO_MAGIC_TC);
     SWAP_FLAGS(f->file_flags, FLOWFILE_NO_MAGIC_TS, FLOWFILE_NO_MAGIC_TC);
@@ -201,14 +200,14 @@ static inline void FlowSwapFileFlags(Flow *f)
     SWAP_FLAGS(f->file_flags, FLOWFILE_NO_MAGIC_TS, FLOWFILE_NO_MAGIC_TC);
 }
 
-static inline void TcpStreamFlowSwap(Flow *f)
+static inline void swap_tcp_stream_flow(FLOW *f)
 {
-    TcpSession *ssn = f->protoctx;
-    SWAP_VARS(TcpStream, ssn->server, ssn->client);
-    if (ssn->data_first_seen_dir & STREAM_TOSERVER) {
-        ssn->data_first_seen_dir = STREAM_TOCLIENT;
-    } else if (ssn->data_first_seen_dir & STREAM_TOCLIENT) {
-        ssn->data_first_seen_dir = STREAM_TOSERVER;
+    TCP_SESSION *sess = f->protoctx;
+    SWAP_VARS(TCP_STREAM, sess->server, sess->client);
+    if (sess->data_first_seen_dir & STREAM_TOSERVER) {
+        sess->data_first_seen_dir = STREAM_TOCLIENT;
+    } else if (sess->data_first_seen_dir & STREAM_TOCLIENT) {
+        sess->data_first_seen_dir = STREAM_TOSERVER;
     }
 }
 
@@ -216,28 +215,28 @@ static inline void TcpStreamFlowSwap(Flow *f)
  *  \note leaves the 'header' untouched. Interpret that based
  *        on FLOW_DIR_REVERSED flag.
  *  \warning: only valid before applayer parsing started. This
- *            function doesn't swap anything in Flow::alparser,
- *            Flow::alstate
+ *            function doesn't swap anything in FLOW::alparser,
+ *            FLOW::alstate
  */
-void FlowSwap(Flow *f)
+void swap_flow(FLOW *f)
 {
     f->flags |= FLOW_DIR_REVERSED;
 
     SWAP_VARS(uint32_t, f->probing_parser_toserver_alproto_masks,
                    f->probing_parser_toclient_alproto_masks);
 
-    FlowSwapFlags(f);
-    FlowSwapFileFlags(f);
+    FLOWSwapFlags(f);
+    FLOWSwapFileFlags(f);
 
-    if (f->proto == IPPROTO_TCP) {
-        TcpStreamFlowSwap(f);
+    if (f->proto == IP_PROTO_TCP) {
+        TcpStreamFLOWSwap(f);
     }
 
     SWAP_VARS(AppProto, f->alproto_ts, f->alproto_tc);
     SWAP_VARS(uint8_t, f->min_ttl_toserver, f->max_ttl_toserver);
     SWAP_VARS(uint8_t, f->min_ttl_toclient, f->max_ttl_toclient);
 
-    /* not touching Flow::alparser and Flow::alstate */
+    /* not touching FLOW::alparser and FLOW::alstate */
 
     SWAP_VARS(const void *, f->sgh_toclient, f->sgh_toserver);
 
@@ -250,11 +249,11 @@ void FlowSwap(Flow *f)
  *  \retval 0 to_server
  *  \retval 1 to_client
  */
-int FlowGetPacketDirection(const Flow *f, const Packet *p)
+int get_packet_direction(const FLOW *f, const PACKAT *p)
 {
     const int reverse = (f->flags & FLOW_DIR_REVERSED) != 0;
 
-    if (p->proto == IPPROTO_TCP || p->proto == IPPROTO_UDP || p->proto == IPPROTO_SCTP) {
+    if (p->proto == IP_PROTO_TCP || p->proto == IP_PROTO_UDP || p->proto == IP_PROTO_SCTP) {
         if (!(CMP_PORT(p->sp,p->dp))) {
             /* update flags and counters */
             if (CMP_PORT(f->sp,p->sp)) {
@@ -269,7 +268,7 @@ int FlowGetPacketDirection(const Flow *f, const Packet *p)
                 return TOCLIENT ^ reverse;
             }
         }
-    } else if (p->proto == IPPROTO_ICMP || p->proto == IPPROTO_ICMPV6) {
+    } else if (p->proto == IP_PROTO_ICMP || p->proto == IP_PROTO_ICMPV6) {
         if (CMP_ADDR(&f->src,&p->src)) {
             return TOSERVER  ^ reverse;
         } else {
@@ -289,7 +288,7 @@ int FlowGetPacketDirection(const Flow *f, const Packet *p)
  *  \retval 1 true
  *  \retval 0 false
  */
-static inline int FlowUpdateSeenFlag(const Packet *p)
+static inline int FLOWUpdateSeenFlag(const PACKAT *p)
 {
     if (PKT_IS_ICMPV4(p)) {
         if (ICMPV4_IS_ERROR_MSG(p)) {
@@ -300,9 +299,9 @@ static inline int FlowUpdateSeenFlag(const Packet *p)
     return 1;
 }
 
-static inline void FlowUpdateTTL(Flow *f, Packet *p, uint8_t ttl)
+static inline void FLOWUpdateTTL(FLOW *f, PACKAT *p, uint8_t ttl)
 {
-    if (FlowGetPacketDirection(f, p) == TOSERVER) {
+    if (FLOWGetPACKATDirection(f, p) == TOSERVER) {
         if (f->min_ttl_toserver == 0) {
             f->min_ttl_toserver = ttl;
         } else {
@@ -319,7 +318,7 @@ static inline void FlowUpdateTTL(Flow *f, Packet *p, uint8_t ttl)
     }
 }
 
-/** \brief Update Packet and Flow
+/** \brief Update PACKAT and FLOW
  *
  *  Updates packet and flow based on the new packet.
  *
@@ -328,12 +327,12 @@ static inline void FlowUpdateTTL(Flow *f, Packet *p, uint8_t ttl)
  *
  *  \note overwrites p::flowflags
  */
-void FlowHandlePacketUpdate(Flow *f, Packet *p)
+void FLOWHandlePACKATUpdate(FLOW *f, PACKAT *p)
 {
     SCLogDebug("packet %"PRIu64" -- flow %p", p->pcap_cnt, f);
 
 #ifdef CAPTURE_OFFLOAD
-    int state = SC_ATOMIC_GET(f->flow_state);
+    int state = ATOMIC_GET(f->flow_state);
 
     if (state != FLOW_STATE_CAPTURE_BYPASSED) {
 #endif
@@ -345,23 +344,23 @@ void FlowHandlePacketUpdate(Flow *f, Packet *p)
         if (p->ts.tv_sec - f->lastts.tv_sec > FLOW_BYPASSED_TIMEOUT / 2) {
             SCLogDebug("Downgrading flow to local bypass");
             COPY_TIMESTAMP(&p->ts, &f->lastts);
-            FlowUpdateState(f, FLOW_STATE_LOCAL_BYPASSED);
+            FLOWUpdateState(f, FLOW_STATE_LOCAL_BYPASSED);
         } else {
             /* In IPS mode the packet could come from the other interface so it would
              * need to be bypassed */
             if (EngineModeIsIPS()) {
-                BypassedFlowUpdate(f, p);
+                BypassedFLOWUpdate(f, p);
             }
         }
     }
 #endif
     /* update flags and counters */
-    if (FlowGetPacketDirection(f, p) == TOSERVER) {
+    if (FLOWGetPACKATDirection(f, p) == TOSERVER) {
         f->todstpktcnt++;
         f->todstbytecnt += GET_PKT_LEN(p);
         p->flowflags = FLOW_PKT_TOSERVER;
         if (!(f->flags & FLOW_TO_DST_SEEN)) {
-            if (FlowUpdateSeenFlag(p)) {
+            if (FLOWUpdateSeenFlag(p)) {
                 f->flags |= FLOW_TO_DST_SEEN;
                 p->flowflags |= FLOW_PKT_TOSERVER_FIRST;
             }
@@ -376,7 +375,7 @@ void FlowHandlePacketUpdate(Flow *f, Packet *p)
         f->tosrcbytecnt += GET_PKT_LEN(p);
         p->flowflags = FLOW_PKT_TOCLIENT;
         if (!(f->flags & FLOW_TO_SRC_SEEN)) {
-            if (FlowUpdateSeenFlag(p)) {
+            if (FLOWUpdateSeenFlag(p)) {
                 f->flags |= FLOW_TO_SRC_SEEN;
                 p->flowflags |= FLOW_PKT_TOCLIENT_FIRST;
             }
@@ -388,13 +387,13 @@ void FlowHandlePacketUpdate(Flow *f, Packet *p)
         }
     }
 
-    if (SC_ATOMIC_GET(f->flow_state) == FLOW_STATE_ESTABLISHED) {
+    if (ATOMIC_GET(f->flow_state) == FLOW_STATE_ESTABLISHED) {
         SCLogDebug("pkt %p FLOW_PKT_ESTABLISHED", p);
         p->flowflags |= FLOW_PKT_ESTABLISHED;
 
-    } else if (f->proto == IPPROTO_TCP) {
-        TcpSession *ssn = (TcpSession *)f->protoctx;
-        if (ssn != NULL && ssn->state >= TCP_ESTABLISHED) {
+    } else if (f->proto == IP_PROTO_TCP) {
+        TcpSession *sess = (TcpSession *)f->protoctx;
+        if (sess != NULL && sess->state >= TCP_ESTABLISHED) {
             p->flowflags |= FLOW_PKT_ESTABLISHED;
         }
     } else if ((f->flags & (FLOW_TO_DST_SEEN|FLOW_TO_SRC_SEEN)) ==
@@ -402,13 +401,13 @@ void FlowHandlePacketUpdate(Flow *f, Packet *p)
         SCLogDebug("pkt %p FLOW_PKT_ESTABLISHED", p);
         p->flowflags |= FLOW_PKT_ESTABLISHED;
 
-        FlowUpdateState(f, FLOW_STATE_ESTABLISHED);
+        FLOWUpdateState(f, FLOW_STATE_ESTABLISHED);
     }
 
     /*set the detection bypass flags*/
     if (f->flags & FLOW_NOPACKET_INSPECTION) {
         SCLogDebug("setting FLOW_NOPACKET_INSPECTION flag on flow %p", f);
-        DecodeSetNoPacketInspectionFlag(p);
+        DecodeSetNoPACKATInspectionFlag(p);
     }
     if (f->flags & FLOW_NOPAYLOAD_INSPECTION) {
         SCLogDebug("setting FLOW_NOPAYLOAD_INSPECTION flag on flow %p", f);
@@ -418,9 +417,9 @@ void FlowHandlePacketUpdate(Flow *f, Packet *p)
 
     /* update flow's ttl fields if needed */
     if (PKT_IS_IPV4(p)) {
-        FlowUpdateTTL(f, p, IPV4_GET_IPTTL(p));
+        FLOWUpdateTTL(f, p, IPV4_GET_IPTTL(p));
     } else if (PKT_IS_IPV6(p)) {
-        FlowUpdateTTL(f, p, IPV6_GET_HLIM(p));
+        FLOWUpdateTTL(f, p, IPV6_GET_HLIM(p));
     }
 }
 
@@ -432,12 +431,12 @@ void FlowHandlePacketUpdate(Flow *f, Packet *p)
  *  \param dtv decode thread vars (for flow output api thread data)
  *  \param p packet to handle flow for
  */
-void FlowHandlePacket(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p)
+void FLOWHandlePACKAT(ThreadVars *tv, DecodeThreadVars *dtv, PACKAT *p)
 {
-    /* Get this packet's flow from the hash. FlowHandlePacket() will setup
+    /* Get this packet's flow from the hash. FLOWHandlePACKAT() will setup
      * a new flow if nescesary. If we get NULL, we're out of flow memory.
      * The returned flow is locked. */
-    Flow *f = FlowGetFlowFromHash(tv, dtv, p, &p->flow);
+    FLOW *f = FLOWGetFLOWFromHash(tv, dtv, p, &p->flow);
     if (f == NULL)
         return;
 
@@ -448,23 +447,23 @@ void FlowHandlePacket(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p)
 
 /** \brief initialize the configuration
  *  \warning Not thread safe */
-void FlowInitConfig(char quiet)
+void FLOWInitConfig(char quiet)
 {
     SCLogDebug("initializing flow engine...");
 
     memset(&flow_config,  0, sizeof(flow_config));
-    SC_ATOMIC_INIT(flow_flags);
-    SC_ATOMIC_INIT(flow_memuse);
-    SC_ATOMIC_INIT(flow_prune_idx);
-    SC_ATOMIC_INIT(flow_config.memcap);
-    FlowQueueInit(&flow_spare_q);
-    FlowQueueInit(&flow_recycle_q);
+    ATOMIC_INIT(flow_flags);
+    ATOMIC_INIT(flow_memuse);
+    ATOMIC_INIT(flow_prune_idx);
+    ATOMIC_INIT(flow_config.memcap);
+    FLOWQueueInit(&flow_spare_q);
+    FLOWQueueInit(&flow_recycle_q);
 
     /* set defaults */
     flow_config.hash_rand   = (uint32_t)RandomGet();
     flow_config.hash_size   = FLOW_DEFAULT_HASHSIZE;
     flow_config.prealloc    = FLOW_DEFAULT_PREALLOC;
-    SC_ATOMIC_SET(flow_config.memcap, FLOW_DEFAULT_MEMCAP);
+    ATOMIC_SET(flow_config.memcap, FLOW_DEFAULT_MEMCAP);
 
     /* If we have specific config, overwrite the defaults with them,
      * otherwise, leave the default values */
@@ -473,7 +472,7 @@ void FlowInitConfig(char quiet)
         if (val <= 100 && val >= 1) {
             flow_config.emergency_recovery = (uint8_t)val;
         } else {
-            SCLogError(SC_ERR_INVALID_VALUE, "flow.emergency-recovery must be in the range of 1 and 100 (as percentage)");
+            SCLogError(ERR_INVALID_VALUE, "flow.emergency-recovery must be in the range of 1 and 100 (as percentage)");
             flow_config.emergency_recovery = FLOW_DEFAULT_EMERGENCY_RECOVERY;
         }
     } else {
@@ -490,22 +489,22 @@ void FlowInitConfig(char quiet)
     if ((ConfGet("flow.memcap", &conf_val)) == 1)
     {
         if (conf_val == NULL) {
-            FatalError(SC_ERR_FATAL, "Invalid value for flow.memcap: NULL");
+            FatalError(ERR_FATAL, "Invalid value for flow.memcap: NULL");
         }
 
         if (ParseSizeStringU64(conf_val, &flow_memcap_copy) < 0) {
-            SCLogError(SC_ERR_SIZE_PARSE, "Error parsing flow.memcap "
+            SCLogError(ERR_SIZE_PARSE, "Error parsing flow.memcap "
                        "from conf file - %s.  Killing engine",
                        conf_val);
             exit(EXIT_FAILURE);
         } else {
-            SC_ATOMIC_SET(flow_config.memcap, flow_memcap_copy);
+            ATOMIC_SET(flow_config.memcap, flow_memcap_copy);
         }
     }
     if ((ConfGet("flow.hash-size", &conf_val)) == 1)
     {
         if (conf_val == NULL) {
-            FatalError(SC_ERR_FATAL, "Invalid value for flow.hash-size: NULL");
+            FatalError(ERR_FATAL, "Invalid value for flow.hash-size: NULL");
         }
 
         if (StringParseUint32(&configval, 10, strlen(conf_val),
@@ -516,7 +515,7 @@ void FlowInitConfig(char quiet)
     if ((ConfGet("flow.prealloc", &conf_val)) == 1)
     {
         if (conf_val == NULL) {
-            FatalError(SC_ERR_FATAL, "Invalid value for flow.prealloc: NULL");
+            FatalError(ERR_FATAL, "Invalid value for flow.prealloc: NULL");
         }
 
         if (StringParseUint32(&configval, 10, strlen(conf_val),
@@ -524,95 +523,95 @@ void FlowInitConfig(char quiet)
             flow_config.prealloc = configval;
         }
     }
-    SCLogDebug("Flow config from suricata.yaml: memcap: %"PRIu64", hash-size: "
-               "%"PRIu32", prealloc: %"PRIu32, SC_ATOMIC_GET(flow_config.memcap),
+    SCLogDebug("FLOW config from suricata.yaml: memcap: %"PRIu64", hash-size: "
+               "%"PRIu32", prealloc: %"PRIu32, ATOMIC_GET(flow_config.memcap),
                flow_config.hash_size, flow_config.prealloc);
 
     /* alloc hash memory */
-    uint64_t hash_size = flow_config.hash_size * sizeof(FlowBucket);
+    uint64_t hash_size = flow_config.hash_size * sizeof(FLOWBucket);
     if (!(FLOW_CHECK_MEMCAP(hash_size))) {
-        SCLogError(SC_ERR_FLOW_INIT, "allocating flow hash failed: "
+        SCLogError(ERR_FLOW_INIT, "allocating flow hash failed: "
                 "max flow memcap is smaller than projected hash size. "
                 "Memcap: %"PRIu64", Hash table size %"PRIu64". Calculate "
                 "total hash size by multiplying \"flow.hash-size\" with %"PRIuMAX", "
-                "which is the hash bucket size.", SC_ATOMIC_GET(flow_config.memcap), hash_size,
-                (uintmax_t)sizeof(FlowBucket));
+                "which is the hash bucket size.", ATOMIC_GET(flow_config.memcap), hash_size,
+                (uintmax_t)sizeof(FLOWBucket));
         exit(EXIT_FAILURE);
     }
-    flow_hash = SCMallocAligned(flow_config.hash_size * sizeof(FlowBucket), CLS);
+    flow_hash = SCMallocAligned(flow_config.hash_size * sizeof(FLOWBucket), CLS);
     if (unlikely(flow_hash == NULL)) {
-        FatalError(SC_ERR_FATAL,
-                   "Fatal error encountered in FlowInitConfig. Exiting...");
+        FatalError(ERR_FATAL,
+                   "Fatal error encountered in FLOWInitConfig. Exiting...");
     }
-    memset(flow_hash, 0, flow_config.hash_size * sizeof(FlowBucket));
+    memset(flow_hash, 0, flow_config.hash_size * sizeof(FLOWBucket));
 
     uint32_t i = 0;
     for (i = 0; i < flow_config.hash_size; i++) {
         FBLOCK_INIT(&flow_hash[i]);
-        SC_ATOMIC_INIT(flow_hash[i].next_ts);
+        ATOMIC_INIT(flow_hash[i].next_ts);
     }
-    (void) SC_ATOMIC_ADD(flow_memuse, (flow_config.hash_size * sizeof(FlowBucket)));
+    (void) ATOMIC_ADD(flow_memuse, (flow_config.hash_size * sizeof(FLOWBucket)));
 
     if (quiet == FALSE) {
         SCLogConfig("allocated %"PRIu64" bytes of memory for the flow hash... "
                   "%" PRIu32 " buckets of size %" PRIuMAX "",
-                  SC_ATOMIC_GET(flow_memuse), flow_config.hash_size,
-                  (uintmax_t)sizeof(FlowBucket));
+                  ATOMIC_GET(flow_memuse), flow_config.hash_size,
+                  (uintmax_t)sizeof(FLOWBucket));
     }
 
     /* pre allocate flows */
     for (i = 0; i < flow_config.prealloc; i++) {
-        if (!(FLOW_CHECK_MEMCAP(sizeof(Flow) + FlowStorageSize()))) {
-            SCLogError(SC_ERR_FLOW_INIT, "preallocating flows failed: "
+        if (!(FLOW_CHECK_MEMCAP(sizeof(FLOW) + FLOWStorageSize()))) {
+            SCLogError(ERR_FLOW_INIT, "preallocating flows failed: "
                     "max flow memcap reached. Memcap %"PRIu64", "
-                    "Memuse %"PRIu64".", SC_ATOMIC_GET(flow_config.memcap),
-                    ((uint64_t)SC_ATOMIC_GET(flow_memuse) + (uint64_t)sizeof(Flow)));
+                    "Memuse %"PRIu64".", ATOMIC_GET(flow_config.memcap),
+                    ((uint64_t)ATOMIC_GET(flow_memuse) + (uint64_t)sizeof(FLOW)));
             exit(EXIT_FAILURE);
         }
 
-        Flow *f = FlowAlloc();
+        FLOW *f = FLOWAlloc();
         if (f == NULL) {
-            SCLogError(SC_ERR_FLOW_INIT, "preallocating flow failed: %s", strerror(errno));
+            SCLogError(ERR_FLOW_INIT, "preallocating flow failed: %s", strerror(errno));
             exit(EXIT_FAILURE);
         }
 
-        FlowEnqueue(&flow_spare_q,f);
+        FLOWEnqueue(&flow_spare_q,f);
     }
 
     if (quiet == FALSE) {
         SCLogConfig("preallocated %" PRIu32 " flows of size %" PRIuMAX "",
-                flow_spare_q.len, (uintmax_t)(sizeof(Flow) + + FlowStorageSize()));
+                flow_spare_q.len, (uintmax_t)(sizeof(FLOW) + + FLOWStorageSize()));
         SCLogConfig("flow memory usage: %"PRIu64" bytes, maximum: %"PRIu64,
-                SC_ATOMIC_GET(flow_memuse), SC_ATOMIC_GET(flow_config.memcap));
+                ATOMIC_GET(flow_memuse), ATOMIC_GET(flow_config.memcap));
     }
 
-    FlowInitFlowProto();
+    FLOWInitFLOWProto();
 
     return;
 }
 
 /** \brief print some flow stats
  *  \warning Not thread safe */
-static void FlowPrintStats (void)
+static void FLOWPrintStats (void)
 {
     return;
 }
 
 /** \brief shutdown the flow engine
  *  \warning Not thread safe */
-void FlowShutdown(void)
+void FLOWShutdown(void)
 {
-    Flow *f;
+    FLOW *f;
     uint32_t u;
 
-    FlowPrintStats();
+    FLOWPrintStats();
 
     /* free queues */
-    while((f = FlowDequeue(&flow_spare_q))) {
-        FlowFree(f);
+    while((f = FLOWDequeue(&flow_spare_q))) {
+        FLOWFree(f);
     }
-    while((f = FlowDequeue(&flow_recycle_q))) {
-        FlowFree(f);
+    while((f = FLOWDequeue(&flow_recycle_q))) {
+        FLOWFree(f);
     }
 
     /* clear and free the hash */
@@ -621,11 +620,11 @@ void FlowShutdown(void)
         for (u = 0; u < flow_config.hash_size; u++) {
             f = flow_hash[u].head;
             while (f) {
-                DEBUG_VALIDATE_BUG_ON(SC_ATOMIC_GET(f->use_cnt) != 0);
-                Flow *n = f->hnext;
-                uint8_t proto_map = FlowGetProtoMapping(f->proto);
-                FlowClearMemory(f, proto_map);
-                FlowFree(f);
+                DEBUG_VALIDATE_BUG_ON(ATOMIC_GET(f->use_cnt) != 0);
+                FLOW *n = f->hnext;
+                uint8_t proto_map = FLOWGetProtoMapping(f->proto);
+                FLOWClearMemory(f, proto_map);
+                FLOWFree(f);
                 f = n;
             }
 
@@ -634,9 +633,9 @@ void FlowShutdown(void)
         SCFreeAligned(flow_hash);
         flow_hash = NULL;
     }
-    (void) SC_ATOMIC_SUB(flow_memuse, flow_config.hash_size * sizeof(FlowBucket));
-    FlowQueueDestroy(&flow_spare_q);
-    FlowQueueDestroy(&flow_recycle_q);
+    (void) ATOMIC_SUB(flow_memuse, flow_config.hash_size * sizeof(FLOWBucket));
+    FLOWQueueDestroy(&flow_spare_q);
+    FLOWQueueDestroy(&flow_recycle_q);
     return;
 }
 
@@ -645,9 +644,9 @@ void FlowShutdown(void)
  *          function for all supported flow_proto.
  */
 
-void FlowInitFlowProto(void)
+void FLOWInitFLOWProto(void)
 {
-    FlowTimeoutsInit();
+    FLOWTimeoutsInit();
 
 #define SET_DEFAULTS(p, n, e, c, b, ne, ee, ce, be)     \
     flow_timeouts_normal[(p)].new_timeout = (n);     \
@@ -665,19 +664,19 @@ void FlowInitFlowProto(void)
                 FLOW_DEFAULT_EMERG_NEW_TIMEOUT, FLOW_DEFAULT_EMERG_EST_TIMEOUT,
                     0, FLOW_DEFAULT_EMERG_BYPASSED_TIMEOUT);
     SET_DEFAULTS(FLOW_PROTO_TCP,
-                FLOW_IPPROTO_TCP_NEW_TIMEOUT, FLOW_IPPROTO_TCP_EST_TIMEOUT,
-                    FLOW_IPPROTO_TCP_CLOSED_TIMEOUT, FLOW_IPPROTO_TCP_BYPASSED_TIMEOUT,
-                FLOW_IPPROTO_TCP_EMERG_NEW_TIMEOUT, FLOW_IPPROTO_TCP_EMERG_EST_TIMEOUT,
-                    FLOW_IPPROTO_TCP_EMERG_CLOSED_TIMEOUT, FLOW_DEFAULT_EMERG_BYPASSED_TIMEOUT);
+                FLOW_IP_PROTO_TCP_NEW_TIMEOUT, FLOW_IP_PROTO_TCP_EST_TIMEOUT,
+                    FLOW_IP_PROTO_TCP_CLOSED_TIMEOUT, FLOW_IP_PROTO_TCP_BYPASSED_TIMEOUT,
+                FLOW_IP_PROTO_TCP_EMERG_NEW_TIMEOUT, FLOW_IP_PROTO_TCP_EMERG_EST_TIMEOUT,
+                    FLOW_IP_PROTO_TCP_EMERG_CLOSED_TIMEOUT, FLOW_DEFAULT_EMERG_BYPASSED_TIMEOUT);
     SET_DEFAULTS(FLOW_PROTO_UDP,
-                FLOW_IPPROTO_UDP_NEW_TIMEOUT, FLOW_IPPROTO_UDP_EST_TIMEOUT,
-                    0, FLOW_IPPROTO_UDP_BYPASSED_TIMEOUT,
-                FLOW_IPPROTO_UDP_EMERG_NEW_TIMEOUT, FLOW_IPPROTO_UDP_EMERG_EST_TIMEOUT,
+                FLOW_IP_PROTO_UDP_NEW_TIMEOUT, FLOW_IP_PROTO_UDP_EST_TIMEOUT,
+                    0, FLOW_IP_PROTO_UDP_BYPASSED_TIMEOUT,
+                FLOW_IP_PROTO_UDP_EMERG_NEW_TIMEOUT, FLOW_IP_PROTO_UDP_EMERG_EST_TIMEOUT,
                     0, FLOW_DEFAULT_EMERG_BYPASSED_TIMEOUT);
     SET_DEFAULTS(FLOW_PROTO_ICMP,
-                FLOW_IPPROTO_ICMP_NEW_TIMEOUT, FLOW_IPPROTO_ICMP_EST_TIMEOUT,
-                    0, FLOW_IPPROTO_ICMP_BYPASSED_TIMEOUT,
-                FLOW_IPPROTO_ICMP_EMERG_NEW_TIMEOUT, FLOW_IPPROTO_ICMP_EMERG_EST_TIMEOUT,
+                FLOW_IP_PROTO_ICMP_NEW_TIMEOUT, FLOW_IP_PROTO_ICMP_EST_TIMEOUT,
+                    0, FLOW_IP_PROTO_ICMP_BYPASSED_TIMEOUT,
+                FLOW_IP_PROTO_ICMP_EMERG_NEW_TIMEOUT, FLOW_IP_PROTO_ICMP_EMERG_EST_TIMEOUT,
                     0, FLOW_DEFAULT_EMERG_BYPASSED_TIMEOUT);
 
     flow_freefuncs[FLOW_PROTO_DEFAULT].Freefunc = NULL;
@@ -952,9 +951,9 @@ void FlowInitFlowProto(void)
  *  \param  proto_map   mapped value of the protocol to FLOW_PROTO's.
  */
 
-int FlowClearMemory(Flow* f, uint8_t proto_map)
+int clear_flow_memory(FLOW* f, uint8_t proto_map)
 {
-    SCEnter();
+    enter();
 
     if (unlikely(f->flags & FLOW_HAS_EXPECTATION)) {
         AppLayerExpectationClean(f);
@@ -965,7 +964,7 @@ int FlowClearMemory(Flow* f, uint8_t proto_map)
         flow_freefuncs[proto_map].Freefunc(f->protoctx);
     }
 
-    FlowFreeStorage(f);
+    FLOWFreeStorage(f);
 
     FLOW_RECYCLE(f);
 
@@ -980,21 +979,21 @@ int FlowClearMemory(Flow* f, uint8_t proto_map)
  *                  specific memory.
  */
 
-int FlowSetProtoFreeFunc (uint8_t proto, void (*Free)(void *))
+int FLOWSetProtoFreeFunc (uint8_t proto, void (*Free)(void *))
 {
     uint8_t proto_map;
-    proto_map = FlowGetProtoMapping(proto);
+    proto_map = FLOWGetProtoMapping(proto);
 
     flow_freefuncs[proto_map].Freefunc = Free;
     return 1;
 }
 
-AppProto FlowGetAppProtocol(const Flow *f)
+AppProto FLOWGetAppProtocol(const FLOW *f)
 {
     return f->alproto;
 }
 
-void *FlowGetAppState(const Flow *f)
+void *FLOWGetAppState(const FLOW *f)
 {
     return f->alstate;
 }
@@ -1006,18 +1005,18 @@ void *FlowGetAppState(const Flow *f)
  *  \retval flags original flags + disrupt flags (if any)
  *  \TODO handle UDP
  */
-uint8_t FlowGetDisruptionFlags(const Flow *f, uint8_t flags)
+uint8_t get_glow_disruption_flags(const FLOW *f, uint8_t flags)
 {
-    if (f->proto != IPPROTO_TCP) {
+    if (f->proto != IP_PROTO_TCP) {
         return flags;
     }
     if (f->protoctx == NULL) {
         return flags;
     }
 
-    uint8_t newflags = flags;
-    TcpSession *ssn = f->protoctx;
-    TcpStream *stream = flags & STREAM_TOSERVER ? &ssn->client : &ssn->server;
+    uint8_t new_flags = flags;
+    TCP_SESSION *sess = f->protoctx;
+    TCP_STREAM *stream = flags & STREAM_TO_SERVER ? &sess->client : &sess->server;
 
     if (stream->flags & STREAMTCP_STREAM_FLAG_DEPTH_REACHED) {
         newflags |= STREAM_DEPTH;
@@ -1030,15 +1029,15 @@ uint8_t FlowGetDisruptionFlags(const Flow *f, uint8_t flags)
     return newflags;
 }
 
-void FlowUpdateState(Flow *f, enum FlowState s)
+void update_flow_state(FLOW *f, enum FLOW_STATE s)
 {
     /* set the state */
-    SC_ATOMIC_SET(f->flow_state, s);
+    ATOMIC_SET(f->flow_state, s);
 
     if (f->fb) {
         /* and reset the flow buckup next_ts value so that the flow manager
          * has to revisit this row */
-        SC_ATOMIC_SET(f->fb->next_ts, 0);
+        ATOMIC_SET(f->fb->next_ts, 0);
     }
 }
 
@@ -1049,7 +1048,7 @@ void FlowUpdateState(Flow *f, enum FlowState s)
  * parts into output pointers to make it simpler to call from Rust
  * over FFI using only basic data types.
  */
-void FlowGetLastTimeAsParts(Flow *flow, uint64_t *secs, uint64_t *usecs)
+void FLOWGetLastTimeAsParts(FLOW *flow, uint64_t *secs, uint64_t *usecs)
 {
     *secs = (uint64_t)flow->lastts.tv_sec;
     *usecs = (uint64_t)flow->lastts.tv_usec;

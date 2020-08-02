@@ -13,8 +13,9 @@ cc_binary(
 		"cicflowmeter.c",
 	],
 	deps = [
-		"//cicflowmeter-c/utils:utils-dep",
+		"//cicflowmeter-c/util:util-dep",
 		"//cicflowmeter-c/common:common-dep",
+		"//cicflowmeter-c/decode:decode-dep",
 		":cicflowmeter-dep",
 	],
 
