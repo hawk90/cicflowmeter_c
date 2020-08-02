@@ -1,7 +1,5 @@
-#ifndef __CICFLOWMETER_UTILS_TIME_H__
-#define __CICFLOWMETER_UTILS_TIME_H__
-
-#include <time.h>
+#ifndef __CICFLOWMETER_UTIL_TIME_H__
+#define __CICFLOWMETER_UTIL_TIME_H__
 
 
 #endif

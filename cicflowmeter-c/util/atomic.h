@@ -1,5 +1,5 @@
-#ifndef __CICFLOWMETER_UTILS_ATOMIC_H__
-#define __CICFLOWMETER_UTILS_ATOMIC_H__
+#ifndef __CICFLOWMETER_UTIL_ATOMIC_H__
+#define __CICFLOWMETER_UTIL_ATOMIC_H__
 
 #include <stdatomic.h>
 

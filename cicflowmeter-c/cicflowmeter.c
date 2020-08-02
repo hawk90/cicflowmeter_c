@@ -1,7 +1,6 @@
-#include <netinet/if_ether.h>
-
 #include "common/cicflowmeter-common.h"
-#include "utils/debug.h"
+
+#include "util/debug.h"
 
 #define NEXT_EX_OK 1
 

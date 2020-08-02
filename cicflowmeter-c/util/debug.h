@@ -1,5 +1,5 @@
-#ifndef __CICFLOWMETER_UTILS_DEBUG_H__
-#define __CICFLOWMETER_UTILS_DEBUG_H__
+#ifndef __CICFLOWMETER_UTIL_DEBUG_H__
+#define __CICFLOWMETER_UTIL_DEBUG_H__
 
 #ifdef __cplusplus
 extern "C" {
