@@ -960,15 +960,15 @@ int clear_flow_memory(FLOW* f, uint8_t proto_map)
     }
 
     /* call the protocol specific free function if we have one */
-    if (flow_freefuncs[proto_map].Freefunc != NULL) {
-        flow_freefuncs[proto_map].Freefunc(f->protoctx);
+    if (flow_free_funcs[proto_map].Free_func != NULL) {
+        flow_free_funcs[proto_map].Free_func(f->proto_ctx);
     }
 
     FLOWFreeStorage(f);
 
     FLOW_RECYCLE(f);
 
-    SCReturnInt(1);
+    ReturnInt(1);
 }
 
 /**
@@ -979,12 +979,13 @@ int clear_flow_memory(FLOW* f, uint8_t proto_map)
  *                  specific memory.
  */
 
-int FLOWSetProtoFreeFunc (uint8_t proto, void (*Free)(void *))
+int set_flow_proto_free_func (uint8_t proto, void (*FREE)(void *))
 {
     uint8_t proto_map;
-    proto_map = FLOWGetProtoMapping(proto);
+    proto_map = get_flow_proto_mapping(proto);
 
-    flow_freefuncs[proto_map].Freefunc = Free;
+    flow_free_funcs[proto_map].free_func = FREE;
+
     return 1;
 }
 
@@ -1048,8 +1049,8 @@ void update_flow_state(FLOW *f, enum FLOW_STATE s)
  * parts into output pointers to make it simpler to call from Rust
  * over FFI using only basic data types.
  */
-void FLOWGetLastTimeAsParts(FLOW *flow, uint64_t *secs, uint64_t *usecs)
+void get_flow_last_ts(FLOW *flow, uint64_t *secs, uint64_t *usecs)
 {
-    *secs = (uint64_t)flow->lastts.tv_sec;
-    *usecs = (uint64_t)flow->lastts.tv_usec;
+    *secs = (uint64_t)flow->last_ts.tv_sec;
+    *usecs = (uint64_t)flow->last_ts.tv_usec;
 }
