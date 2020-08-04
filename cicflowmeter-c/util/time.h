@@ -1,5 +1,0 @@
-#ifndef __CICFLOWMETER_UTIL_TIME_H__
-#define __CICFLOWMETER_UTIL_TIME_H__
-
-
-#endif
