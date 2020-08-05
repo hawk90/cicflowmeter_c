@@ -2,7 +2,11 @@
 
 /* in flow dir*/
 #include "flow.h"
+#include "decode.h"
+#include "queue.h"
+#include "hash.h"
 
+#include "tcp"
 
 /* in utils dir*/
 
@@ -15,12 +19,12 @@ ATOMIC_DECLARE(uint32_t, g_flow_prune_idx);
 ATOMIC_DECLARE(uint32_t, g_flow_flags);
 ATOMIC_DECLARE(uint64_t, g_flow_mem_use);
 
-FLOW_PROTO_TIMEOUT g_flow_timeouts_normal[FLOW_PROTO_MAX];
-FLOW_PROTO_TIMEOUT g_flow_timeouts_emer[FLOW_PROTO_MAX];
-FLOW_PROTO_FREE_FUNC g_flow_free_func[FLOW_PROTO_MAX];
+FLOW_PROTO_TIMEOUT		g_flow_timeouts_normal[FLOW_PROTO_MAX];
+FLOW_PROTO_TIMEOUT		g_flow_timeouts_emer[FLOW_PROTO_MAX];
+FLOW_PROTO_FREE_FUNC	g_flow_free_func[FLOW_PROTO_MAX];
 
-FLOW_QUEUE g_flow_queue;
-FLOW_CONFIG g_flow_config;
+FLOW_QUEUE	g_flow_queue;
+FLOW_CONFIG	g_flow_config;
 
 /**
  *  \brief Update memcap value
@@ -54,17 +58,6 @@ uint64_t get_flow_mem_use(void)
     return mem_use;
 }
 
-void FLOWCleanupAppLayer(FLOW *f)
-{
-    if (f == NULL || f->proto == 0)
-        return;
-
-    AppLayerParserStateCleanup(f, f->alstate, f->alparser);
-    f->alstate = NULL;
-    f->alparser = NULL;
-    return;
-}
-
 /** \brief Make sure we have enough spare flows.
  *
  *  Enforce the prealloc parameter, so keep at least prealloc flows in the
@@ -81,8 +74,8 @@ int update_spare_flows(void)
 	FLOW *f = NULL;
 
     FQLOCK_LOCK(&g_flow_queue);
-    len = flow_queue.len;
-    FQLOCK_UNLOCK(&flow_queue);
+    len = g_flow_queue.len;
+    FQLOCK_UNLOCK(&g_flow_queue);
 
     if (len < g_flow_config.pre_alloc) {
         to_alloc = g_flow_config.pre_alloc - len;
@@ -117,8 +110,8 @@ int update_spare_flows(void)
   */
 void set_ip_only_flag(FLOW *f, int direction)
 {
-    direction ? (f->flags |= FLOW_TOSERVER_IPONLY_SET) :
-        (f->flags |= FLOW_TOCLIENT_IPONLY_SET);
+    direction ? (flow->flags |= FLOW_TO_SERVER_IP_ONLY_SET) :
+        (flow->flags |= FLOW_TO_CLIENT_IP_ONLY_SET);
     return;
 }
 
@@ -126,9 +119,9 @@ void set_ip_only_flag(FLOW *f, int direction)
  *
  * \param f flow
  */
-void set_has_alerts_flag(FLOW *f)
+void set_flow_has_alerts_flag(FLOW *f)
 {
-    f->flags |= FLOW_HAS_ALERTS;
+    flow->flags |= FLOW_HAS_ALERTS;
 }
 
 /** \brief Check if flow has alerts
@@ -139,7 +132,7 @@ void set_has_alerts_flag(FLOW *f)
  */
 int has_flow_alerts(const FLOW *f)
 {
-    if (f->flags & FLOW_HAS_ALERTS) {
+    if (flow->flags & FLOW_HAS_ALERTS) {
         return 1;
     }
 
@@ -150,18 +143,18 @@ int has_flow_alerts(const FLOW *f)
  *
  * \param f flow
  */
-void set_change_proto_flag(FLOW *f)
+void set_flow_change_proto_flag(FLOW *f)
 {
-    f->flags |= FLOW_CHANGE_PROTO;
+    flow->flags |= FLOW_CHANGE_PROTO;
 }
 
 /** \brief Unset flag to indicate to change proto for the flow
  *
  * \param f flow
  */
-void unset_change_proto_flag(FLOW *f)
+void unset_flow_change_proto_flag(FLOW *f)
 {
-    f->flags &= ~FLOW_CHANGE_PROTO;
+    flow->flags &= ~FLOW_CHANGE_PROTO;
 }
 
 /** \brief Check if change proto flag is set for flow
@@ -171,7 +164,7 @@ void unset_change_proto_flag(FLOW *f)
  */
 int has_flow_change_Proto(FLOW *f)
 {
-    if (f->flags & FLOW_CHANGE_PROTO) {
+    if (flow->flags & FLOW_CHANGE_PROTO) {
         return 1;
     }
 
@@ -180,34 +173,31 @@ int has_flow_change_Proto(FLOW *f)
 
 static inline void swap_flow_flags(FLOW *f)
 {
-    SWAP_FLAGS(f->flags, FLOW_TO_SRC_SEEN, FLOW_TO_DST_SEEN);
-    SWAP_FLAGS(f->flags, FLOW_TOSERVER_IPONLY_SET, FLOW_TOCLIENT_IPONLY_SET);
-    SWAP_FLAGS(f->flags, FLOW_SGH_TOSERVER, FLOW_SGH_TOCLIENT);
+    SWAP_FLAGS(flow->flags, FLOW_TO_SRC_SEEN, FLOW_TO_DST_SEEN);
+    SWAP_FLAGS(flow->flags, FLOW_TO_SERVER_IP_ONLY_SET, FLOW_TO_CLIENT_IP_ONLY_SET);
+    SWAP_FLAGS(flow->flags, FLOW_SGH_TO_SERVER, FLOW_SGH_TO_CLIENT);
 
-    SWAP_FLAGS(f->flags, FLOW_TOSERVER_DROP_LOGGED, FLOW_TOCLIENT_DROP_LOGGED);
-    SWAP_FLAGS(f->flags, FLOW_TS_PM_ALPROTO_DETECT_DONE, FLOW_TC_PM_ALPROTO_DETECT_DONE);
-    SWAP_FLAGS(f->flags, FLOW_TS_PP_ALPROTO_DETECT_DONE, FLOW_TC_PP_ALPROTO_DETECT_DONE);
-    SWAP_FLAGS(f->flags, FLOW_TS_PE_ALPROTO_DETECT_DONE, FLOW_TC_PE_ALPROTO_DETECT_DONE);
+    SWAP_FLAGS(flow->flags, FLOW_TO_SERVER_DROP_LOGGED, FLOW_TO_CLIENT_DROP_LOGGED);
 
-    SWAP_FLAGS(f->flags, FLOW_PROTO_DETECT_TS_DONE, FLOW_PROTO_DETECT_TC_DONE);
+    SWAP_FLAGS(flow->flags, FLOW_PROTO_DETECT_TS_DONE, FLOW_PROTO_DETECT_TC_DONE);
 }
 
 static inline void swap_flow_file_flags(FLOW *f)
 {
-    SWAP_FLAGS(f->file_flags, FLOWFILE_NO_MAGIC_TS, FLOWFILE_NO_MAGIC_TC);
-    SWAP_FLAGS(f->file_flags, FLOWFILE_NO_MAGIC_TS, FLOWFILE_NO_MAGIC_TC);
-    SWAP_FLAGS(f->file_flags, FLOWFILE_NO_MAGIC_TS, FLOWFILE_NO_MAGIC_TC);
-    SWAP_FLAGS(f->file_flags, FLOWFILE_NO_MAGIC_TS, FLOWFILE_NO_MAGIC_TC);
+    SWAP_FLAGS(flow->file_flags, FLOW_FILE_NO_MAGIC_TS, FLOW_FILE_NO_MAGIC_TC);
+    SWAP_FLAGS(flow->file_flags, FLOW_FILE_NO_MAGIC_TS, FLOW_FILE_NO_MAGIC_TC);
+    SWAP_FLAGS(flow->file_flags, FLOW_FILE_NO_MAGIC_TS, FLOW_FILE_NO_MAGIC_TC);
+    SWAP_FLAGS(flow->file_flags, FLOW_FILE_NO_MAGIC_TS, FLOW_FILE_NO_MAGIC_TC);
 }
 
 static inline void swap_tcp_stream_flow(FLOW *f)
 {
-    TCP_SESSION *sess = f->protoctx;
+    TCP_SESSION *sess = flow->proto_ctx;
     SWAP_VARS(TCP_STREAM, sess->server, sess->client);
-    if (sess->data_first_seen_dir & STREAM_TOSERVER) {
-        sess->data_first_seen_dir = STREAM_TOCLIENT;
-    } else if (sess->data_first_seen_dir & STREAM_TOCLIENT) {
-        sess->data_first_seen_dir = STREAM_TOSERVER;
+    if (sess->data_first_seen_dir & STREAM_TO_SERVER) {
+        sess->data_first_seen_dir = STREAM_TO_CLIENT;
+    } else if (sess->data_first_seen_dir & STREAM_TO_CLIENT) {
+        sess->data_first_seen_dir = STREAM_TO_SERVER;
     }
 }
 
@@ -220,28 +210,22 @@ static inline void swap_tcp_stream_flow(FLOW *f)
  */
 void swap_flow(FLOW *f)
 {
-    f->flags |= FLOW_DIR_REVERSED;
+    flow->flags |= FLOW_DIR_REVERSED;
 
-    SWAP_VARS(uint32_t, f->probing_parser_toserver_alproto_masks,
-                   f->probing_parser_toclient_alproto_masks);
+    swap_flow_flags(f);
+    swap_flow_file_flags(f);
 
-    FLOWSwapFlags(f);
-    FLOWSwapFileFlags(f);
-
-    if (f->proto == IP_PROTO_TCP) {
-        TcpStreamFLOWSwap(f);
+    if (flow->proto == IP_PROTO_TCP) {
+        swap_tcp_stream_flow(f);
     }
 
-    SWAP_VARS(AppProto, f->alproto_ts, f->alproto_tc);
-    SWAP_VARS(uint8_t, f->min_ttl_toserver, f->max_ttl_toserver);
-    SWAP_VARS(uint8_t, f->min_ttl_toclient, f->max_ttl_toclient);
+    SWAP_VARS(uint8_t, flow->min_ttl_to_server, flow->max_ttl_to_server);
+    SWAP_VARS(uint8_t, flow->min_ttl_to_client, flow->max_ttl_to_client);
 
-    /* not touching FLOW::alparser and FLOW::alstate */
+    SWAP_VARS(const void *, flow->sgh_to_client, flow->sgh_to_server);
 
-    SWAP_VARS(const void *, f->sgh_toclient, f->sgh_toserver);
-
-    SWAP_VARS(uint32_t, f->todstpktcnt, f->tosrcpktcnt);
-    SWAP_VARS(uint64_t, f->todstbytecnt, f->tosrcbytecnt);
+    SWAP_VARS(uint32_t, flow->to_dst_pkt_cnt, flow->to_src_pkt_cnt);
+    SWAP_VARS(uint64_t, flow->to_dst_byte_cnt, flow->to_src_byte_cnt);
 }
 
 /**
@@ -249,35 +233,35 @@ void swap_flow(FLOW *f)
  *  \retval 0 to_server
  *  \retval 1 to_client
  */
-int get_packet_direction(const FLOW *f, const PACKAT *p)
+int get_packet_direction(const FLOW *flow, const PACKAT *pkt)
 {
-    const int reverse = (f->flags & FLOW_DIR_REVERSED) != 0;
+    const int reverse = (flow->flags & FLOW_DIR_REVERSED) != 0;
 
-    if (p->proto == IP_PROTO_TCP || p->proto == IP_PROTO_UDP || p->proto == IP_PROTO_SCTP) {
-        if (!(CMP_PORT(p->sp,p->dp))) {
+    if (pkt->proto == IP_PROTO_TCP || pkt->proto == IP_PROTO_UDP) {
+        if (!(CMP_PORT(pkt->sport,pkt->dport))) {
             /* update flags and counters */
-            if (CMP_PORT(f->sp,p->sp)) {
-                return TOSERVER ^ reverse;
+            if (CMP_PORT(flow->sport,pkt->sport)) {
+                return TO_SERVER ^ reverse;
             } else {
-                return TOCLIENT ^ reverse;
+                return TO_CLIENT ^ reverse;
             }
         } else {
-            if (CMP_ADDR(&f->src,&p->src)) {
-                return TOSERVER ^ reverse;
+            if (CMP_ADDR(&flow->src,&pkt->src)) {
+                return TO_SERVER ^ reverse;
             } else {
-                return TOCLIENT ^ reverse;
+                return TO_CLIENT ^ reverse;
             }
         }
-    } else if (p->proto == IP_PROTO_ICMP || p->proto == IP_PROTO_ICMPV6) {
-        if (CMP_ADDR(&f->src,&p->src)) {
-            return TOSERVER  ^ reverse;
+    } else if (pkt->proto == IP_PROTO_ICMP) {
+        if (CMP_ADDR(&flow->src,&pkt->src)) {
+            return TO_SERVER  ^ reverse;
         } else {
-            return TOCLIENT ^ reverse;
+            return TO_CLIENT ^ reverse;
         }
     }
 
     /* default to toserver */
-    return TOSERVER;
+    return TO_SERVER;
 }
 
 /**
@@ -288,10 +272,10 @@ int get_packet_direction(const FLOW *f, const PACKAT *p)
  *  \retval 1 true
  *  \retval 0 false
  */
-static inline int FLOWUpdateSeenFlag(const PACKAT *p)
+static inline int update_flow_seen_flag(const PACKAT *p)
 {
-    if (PKT_IS_ICMPV4(p)) {
-        if (ICMPV4_IS_ERROR_MSG(p)) {
+    if (IS_PKT_ICMPV4(p)) {
+        if (IS_ICMPV4_ERROR_MSG(p)) {
             return 0;
         }
     }
@@ -299,22 +283,22 @@ static inline int FLOWUpdateSeenFlag(const PACKAT *p)
     return 1;
 }
 
-static inline void FLOWUpdateTTL(FLOW *f, PACKAT *p, uint8_t ttl)
+static inline void update_flow_ttl(FLOW *flow, PACKAT *pkt, uint8_t ttl)
 {
-    if (FLOWGetPACKATDirection(f, p) == TOSERVER) {
-        if (f->min_ttl_toserver == 0) {
-            f->min_ttl_toserver = ttl;
+    if (get_packet_direction(flow, pkt) == TO_SERVER) {
+        if (flow->min_ttl_to_server == 0) {
+            flow->min_ttl_to_server = ttl;
         } else {
-            f->min_ttl_toserver = MIN(f->min_ttl_toserver, ttl);
+            flow->min_ttl_to_server = MIN(flow->min_ttl_to_server, ttl);
         }
-        f->max_ttl_toserver = MAX(f->max_ttl_toserver, ttl);
+        flow->max_ttl_to_server = MAX(flow->max_ttl_to_server, ttl);
     } else {
-        if (f->min_ttl_toclient == 0) {
-            f->min_ttl_toclient = ttl;
+        if (flow->min_ttl_to_client == 0) {
+            flow->min_ttl_to_client = ttl;
         } else {
-            f->min_ttl_toclient = MIN(f->min_ttl_toclient, ttl);
+            flow->min_ttl_to_client = MIN(flow->min_ttl_to_client, ttl);
         }
-        f->max_ttl_toclient = MAX(f->max_ttl_toclient, ttl);
+        flow->max_ttl_to_client = MAX(flow->max_ttl_to_client, ttl);
     }
 }
 
@@ -325,26 +309,26 @@ static inline void FLOWUpdateTTL(FLOW *f, PACKAT *p, uint8_t ttl)
  *  \param f locked flow
  *  \param p packet
  *
- *  \note overwrites p::flowflags
+ *  \note overwrites p::flow_flags
  */
-void FLOWHandlePACKATUpdate(FLOW *f, PACKAT *p)
+void FLOWHandlePACKATUpdate(FLOW *flow, PACKAT *pkt)
 {
-    SCLogDebug("packet %"PRIu64" -- flow %p", p->pcap_cnt, f);
+    SCLogDebug("packet %"PRIu64" -- flow %p", pkt->pcap_cnt, f);
 
 #ifdef CAPTURE_OFFLOAD
-    int state = ATOMIC_GET(f->flow_state);
+    int state = ATOMIC_GET(flow->state);
 
     if (state != FLOW_STATE_CAPTURE_BYPASSED) {
 #endif
         /* update the last seen timestamp of this flow */
-        COPY_TIMESTAMP(&p->ts, &f->lastts);
+        COPY_TIMESTAMP(&pkt->ts, &fflow->last_ts);
 #ifdef CAPTURE_OFFLOAD
     } else {
         /* still seeing packet, we downgrade to local bypass */
-        if (p->ts.tv_sec - f->lastts.tv_sec > FLOW_BYPASSED_TIMEOUT / 2) {
+        if (pkt->ts.tv_sec - flow->last_ts.tv_sec > FLOW_BYPASSED_TIMEOUT / 2) {
             SCLogDebug("Downgrading flow to local bypass");
-            COPY_TIMESTAMP(&p->ts, &f->lastts);
-            FLOWUpdateState(f, FLOW_STATE_LOCAL_BYPASSED);
+            COPY_TIMESTAMP(&pkt->ts, &flow->last_ts);
+            FLOWUpdateState(flow, FLOW_STATE_LOCAL_BYPASSED);
         } else {
             /* In IPS mode the packet could come from the other interface so it would
              * need to be bypassed */
@@ -355,72 +339,70 @@ void FLOWHandlePACKATUpdate(FLOW *f, PACKAT *p)
     }
 #endif
     /* update flags and counters */
-    if (FLOWGetPACKATDirection(f, p) == TOSERVER) {
-        f->todstpktcnt++;
-        f->todstbytecnt += GET_PKT_LEN(p);
-        p->flowflags = FLOW_PKT_TOSERVER;
-        if (!(f->flags & FLOW_TO_DST_SEEN)) {
-            if (FLOWUpdateSeenFlag(p)) {
-                f->flags |= FLOW_TO_DST_SEEN;
-                p->flowflags |= FLOW_PKT_TOSERVER_FIRST;
+    if (FLOWGetPACKATDirection(flow, pkt) == TO_SERVER) {
+        flow->to_dst_pkt_cnt++;
+        flow->to_dst_byte_cnt += GET_PKT_LEN(pkt);
+        pkt->flow_flags = FLOW_PKT_TO_SERVER;
+        if (!(flow->flags & FLOW_TO_DST_SEEN)) {
+            if (FLOWUpdateSeenFlag(pkt)) {
+                flow->flags |= FLOW_TO_DST_SEEN;
+                pkt->flow_flags |= FLOW_PKT_TO_SERVER_FIRST;
             }
         }
         /* xfer proto detect ts flag to first packet in ts dir */
-        if (f->flags & FLOW_PROTO_DETECT_TS_DONE) {
-            f->flags &= ~FLOW_PROTO_DETECT_TS_DONE;
-            p->flags |= PKT_PROTO_DETECT_TS_DONE;
+        if (flow->flags & FLOW_PROTO_DETECT_TS_DONE) {
+            flow->flags &= ~FLOW_PROTO_DETECT_TS_DONE;
+            pkt->flags |= PKT_PROTO_DETECT_TS_DONE;
         }
     } else {
-        f->tosrcpktcnt++;
-        f->tosrcbytecnt += GET_PKT_LEN(p);
-        p->flowflags = FLOW_PKT_TOCLIENT;
-        if (!(f->flags & FLOW_TO_SRC_SEEN)) {
+        flow->to_src_pkt_cnt++;
+        flow->to_src_byte_cnt += GET_PKT_LEN(p);
+        pkt->flow_flags = FLOW_PKT_TO_CLIENT;
+        if (!(flow->flags & FLOW_TO_SRC_SEEN)) {
             if (FLOWUpdateSeenFlag(p)) {
-                f->flags |= FLOW_TO_SRC_SEEN;
-                p->flowflags |= FLOW_PKT_TOCLIENT_FIRST;
+                flow->flags |= FLOW_TO_SRC_SEEN;
+                pkt->flow_flags |= FLOW_PKT_TO_CLIENT_FIRST;
             }
         }
         /* xfer proto detect tc flag to first packet in tc dir */
-        if (f->flags & FLOW_PROTO_DETECT_TC_DONE) {
-            f->flags &= ~FLOW_PROTO_DETECT_TC_DONE;
-            p->flags |= PKT_PROTO_DETECT_TC_DONE;
+        if (flow->flags & FLOW_PROTO_DETECT_TC_DONE) {
+            flow->flags &= ~FLOW_PROTO_DETECT_TC_DONE;
+            pkt->flags |= PKT_PROTO_DETECT_TC_DONE;
         }
     }
 
-    if (ATOMIC_GET(f->flow_state) == FLOW_STATE_ESTABLISHED) {
-        SCLogDebug("pkt %p FLOW_PKT_ESTABLISHED", p);
-        p->flowflags |= FLOW_PKT_ESTABLISHED;
+    if (ATOMIC_GET(flow->flow_state) == FLOW_STATE_ESTABLISHED) {
+        SCLogDebug("pkt %p FLOW_PKT_ESTABLISHED", pkt);
+        pkt->flow_flags |= FLOW_PKT_ESTABLISHED;
 
-    } else if (f->proto == IP_PROTO_TCP) {
-        TcpSession *sess = (TcpSession *)f->protoctx;
+    } else if (flow->proto == IP_PROTO_TCP) {
+        TCP_SESSION *sess = (TCP_SESSION *)flow->proto_ctx;
         if (sess != NULL && sess->state >= TCP_ESTABLISHED) {
-            p->flowflags |= FLOW_PKT_ESTABLISHED;
+            pkt->flow_flags |= FLOW_PKT_ESTABLISHED;
         }
-    } else if ((f->flags & (FLOW_TO_DST_SEEN|FLOW_TO_SRC_SEEN)) ==
+    } else if ((flow->flags & (FLOW_TO_DST_SEEN|FLOW_TO_SRC_SEEN)) ==
             (FLOW_TO_DST_SEEN|FLOW_TO_SRC_SEEN)) {
-        SCLogDebug("pkt %p FLOW_PKT_ESTABLISHED", p);
-        p->flowflags |= FLOW_PKT_ESTABLISHED;
+        SCLogDebug("pkt %p FLOW_PKT_ESTABLISHED", pkt);
+        pkt->flow_flags |= FLOW_PKT_ESTABLISHED;
 
-        FLOWUpdateState(f, FLOW_STATE_ESTABLISHED);
+        FLOWUpdateState(flow, FLOW_STATE_ESTABLISHED);
     }
 
     /*set the detection bypass flags*/
-    if (f->flags & FLOW_NOPACKET_INSPECTION) {
-        SCLogDebug("setting FLOW_NOPACKET_INSPECTION flag on flow %p", f);
-        DecodeSetNoPACKATInspectionFlag(p);
+    if (flow->flags & FLOW_NOPACKET_INSPECTION) {
+        SCLogDebug("setting FLOW_NOPACKET_INSPECTION flag on flow %p", flow);
+        DecodeSetNoPACKATInspectionFlag(pkt);
     }
-    if (f->flags & FLOW_NOPAYLOAD_INSPECTION) {
-        SCLogDebug("setting FLOW_NOPAYLOAD_INSPECTION flag on flow %p", f);
-        DecodeSetNoPayloadInspectionFlag(p);
+    if (flow->flags & FLOW_NOPAYLOAD_INSPECTION) {
+        SCLogDebug("setting FLOW_NOPAYLOAD_INSPECTION flag on flow %p", flow);
+        DecodeSetNoPayloadInspectionFlag(pkt);
     }
 
 
     /* update flow's ttl fields if needed */
-    if (PKT_IS_IPV4(p)) {
-        FLOWUpdateTTL(f, p, IPV4_GET_IPTTL(p));
-    } else if (PKT_IS_IPV6(p)) {
-        FLOWUpdateTTL(f, p, IPV6_GET_HLIM(p));
-    }
+    if (IS_PKT_IPV4(pkt)) {
+        FLOWUpdateTTL(flow, pkt, IPV4_GET_IP_TTL(pkt));
+    } 
 }
 
 /** \brief Entry point for packet flow handling
@@ -436,12 +418,12 @@ void FLOWHandlePACKAT(ThreadVars *tv, DecodeThreadVars *dtv, PACKAT *p)
     /* Get this packet's flow from the hash. FLOWHandlePACKAT() will setup
      * a new flow if nescesary. If we get NULL, we're out of flow memory.
      * The returned flow is locked. */
-    FLOW *f = FLOWGetFLOWFromHash(tv, dtv, p, &p->flow);
-    if (f == NULL)
+    FLOW *flow = FLOWGetFLOWFromHash(tv, dtv, pkt, &pkt->flow);
+    if (flow == NULL)
         return;
 
     /* set the flow in the packet */
-    p->flags |= PKT_HAS_FLOW;
+    pkt->flags |= PKT_HAS_FLOW;
     return;
 }
 
@@ -451,7 +433,7 @@ void FLOWInitConfig(char quiet)
 {
     SCLogDebug("initializing flow engine...");
 
-    memset(&flow_config,  0, sizeof(flow_config));
+    memset(&g_flow_config,  0, sizeof(flow_config));
     ATOMIC_INIT(flow_flags);
     ATOMIC_INIT(flow_memuse);
     ATOMIC_INIT(flow_prune_idx);
@@ -620,9 +602,9 @@ void FLOWShutdown(void)
         for (u = 0; u < flow_config.hash_size; u++) {
             f = flow_hash[u].head;
             while (f) {
-                DEBUG_VALIDATE_BUG_ON(ATOMIC_GET(f->use_cnt) != 0);
-                FLOW *n = f->hnext;
-                uint8_t proto_map = FLOWGetProtoMapping(f->proto);
+                DEBUG_VALIDATE_BUG_ON(ATOMIC_GET(flow->use_cnt) != 0);
+                FLOW *n = flow->hnext;
+                uint8_t proto_map = FLOWGetProtoMapping(flow->proto);
                 FLOWClearMemory(f, proto_map);
                 FLOWFree(f);
                 f = n;
@@ -955,18 +937,14 @@ int clear_flow_memory(FLOW* f, uint8_t proto_map)
 {
     enter();
 
-    if (unlikely(f->flags & FLOW_HAS_EXPECTATION)) {
-        AppLayerExpectationClean(f);
-    }
-
     /* call the protocol specific free function if we have one */
     if (flow_free_funcs[proto_map].Free_func != NULL) {
-        flow_free_funcs[proto_map].Free_func(f->proto_ctx);
+        flow_free_funcs[proto_map].Free_func(flow->proto_ctx);
     }
 
-    FLOWFreeStorage(f);
+    free_flow_storage(f);
 
-    FLOW_RECYCLE(f);
+    recycle_flow(f);
 
     ReturnInt(1);
 }
@@ -991,12 +969,12 @@ int set_flow_proto_free_func (uint8_t proto, void (*FREE)(void *))
 
 AppProto FLOWGetAppProtocol(const FLOW *f)
 {
-    return f->alproto;
+    return flow->alproto;
 }
 
 void *FLOWGetAppState(const FLOW *f)
 {
-    return f->alstate;
+    return flow->alstate;
 }
 
 /**
@@ -1008,15 +986,15 @@ void *FLOWGetAppState(const FLOW *f)
  */
 uint8_t get_glow_disruption_flags(const FLOW *f, uint8_t flags)
 {
-    if (f->proto != IP_PROTO_TCP) {
+    if (flow->proto != IP_PROTO_TCP) {
         return flags;
     }
-    if (f->protoctx == NULL) {
+    if (flow->proto_ctx == NULL) {
         return flags;
     }
 
     uint8_t new_flags = flags;
-    TCP_SESSION *sess = f->protoctx;
+    TCP_SESSION *sess = flow->proto_ctx;
     TCP_STREAM *stream = flags & STREAM_TO_SERVER ? &sess->client : &sess->server;
 
     if (stream->flags & STREAMTCP_STREAM_FLAG_DEPTH_REACHED) {
@@ -1033,12 +1011,12 @@ uint8_t get_glow_disruption_flags(const FLOW *f, uint8_t flags)
 void update_flow_state(FLOW *f, enum FLOW_STATE s)
 {
     /* set the state */
-    ATOMIC_SET(f->flow_state, s);
+    ATOMIC_SET(flow->flow_state, s);
 
-    if (f->fb) {
+    if (flow->fb) {
         /* and reset the flow buckup next_ts value so that the flow manager
          * has to revisit this row */
-        ATOMIC_SET(f->fb->next_ts, 0);
+        ATOMIC_SET(flow->fb->next_ts, 0);
     }
 }
 
