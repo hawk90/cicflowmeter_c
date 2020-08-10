@@ -1,29 +1,25 @@
+#include <climits.h>
+
 #include "unittest-source.h"
 
-static uint32_t Upper32(uint64_t value)
+
+static uint32_t upper32(uint64_t value)
 {
-    /* uint64_t -> uint32_t is defined behaviour. It slices lower 32bits. */
-    return value >> 32;
+    return (uint32_t)(value >> 32);
 }
-static uint32_t Lower32(uint64_t value)
+static uint32_t lower32(uint64_t value)
 {
-    /* uint64_t -> uint32_t is defined behaviour. It slices lower 32bits. */
-    return value;
+    return (uint32_t)value;
 }
 
-/* Structured test data to make it easier on my eyes */
 typedef struct TestData_ {
-    uint64_t last; /* internal 64bit counter to drag along */
-    u_int current; /* 32bit pcap stat */
-} TestData;
+    uint64_t last;
+    u_int current;
+} TEST_DATA_T;
 
-static int UpdatePcapStatsValue64NoChange01(void)
+static int update_pcap_stats_value64_nochange01(void)
 {
-    /*
-     * No change in counter values.
-     * Last count is within first 32bit range, i.e. same as pcap_stat range.
-     */
-    TestData data[] = {{.last = 0, .current = 0},
+    TEST_DATA_T data[] = {{.last = 0, .current = 0},
             {.last = 12345, .current = 12345},
             {.last = (uint64_t)UINT32_MAX, .current = UINT_MAX}};
 

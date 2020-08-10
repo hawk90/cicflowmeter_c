@@ -1,7 +1,13 @@
 #include <gtest/gtest.h>
-#include "utils-debug.h"
 
-TEST(debugger_test, log_level)
+
+TEST(CICFLOWMETER-C, SOURCE-PCAP)
 {
-	EXPECT_EQ(LOG_NOTSET, -1);
+
+}
+
+int main(int argc, char **argv)
+{
+	::testing::InitGoogleTest(&argc, argv);
+	return RUN_ALL_TESTS();
 }

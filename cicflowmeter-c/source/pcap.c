@@ -153,26 +153,9 @@ static int open_pcap(PCAP_THREAD_T *pcap_vars)
     pcap_vars->pcap_state = PCAP_STATE_DOWN;
 
     rt = pcap_activate(pcap_vars->handle);
-    if (rt == PCAP_WARNING_PROMISC_NOTSUP) {
-		LOG_WARN_MSG();
-		return rt;
-    } else if (rt == PCAP_WARNING_TSTAMP_TYPE_NOTSUP) {
-	} else if (rt == PACAP_WARNING) {
-		LOG_WARN_MSG("%s", pcap_geterr(pcap_vars->handle));
-	} else if (rt == PCAP_ERROR_ACTIVATED) {
-
-	} else if (rt == PCAP_ERROR_NO_SUCH_DEVICE) {
-		
-	} else if (rt == PCAP_ERROR_PERM_DENIED) {
-
-	} else if (rt == PCAP_ERROR_PROMISC_PERM_DENIED) {
-
-	} else if (rt == PCAP_ERROR_RFMON_NOTSUP) {
-
-	} else if (rt == PCAP_ERROR_IFACE_NOT_UP) {
-
-	} else if(rt == ERROR) {
-		LOG_ERR_MSG("%s", pcap_geterr(pcap_vars->handle));
+	if (rt != 0) {
+		LOG_ERR_MSG("pcap_activate: %s\n", pcap_statustostr(rt));
+		goto error;
 	}
 
     pcap_vars->state = PCAP_STATE_UP;
@@ -180,8 +163,10 @@ static int open_pcap(PCAP_THREAD_T *pcap_vars)
     LOG_INFO_MSG("Recovering interface listening");
 
     return 0;
+
 error:
-	pcap_close(pcap_vars->handle);
+	if( pcap_vars->handle)
+		pcap_close(pcap_vars->handle);
 	return rt;
 }
 
@@ -313,14 +298,14 @@ static TmEcode receive_pcap_loop(ThreadVars *tv, void *data, void *slot)
 /**
  * \brief PCAP Break Loop function.
  */
-static TmEcode receive_pcap_breakloop(ThreadVars *tv, void *data)
+static TmEcode receive_pcap_break_loop(ThreadVars *tv, void *data)
 {
     SCEnter();
     PCAP_THREAD_T *pcap_vars = (PCAP_THREAD_T *)data;
     if (pcap_vars->pcap_handle == NULL) {
         SCReturnInt(TM_ECODE_FAILED);
     }
-    pcap_breakloop(pcap_vars->pcap_handle);
+    pcap_break_loop(pcap_vars->pcap_handle);
     SCReturnInt(TM_ECODE_OK);
 }
 
@@ -588,10 +573,11 @@ void pcap_ip_to_device(char *pcap_dev, size_t len)
     ai_hints.ai_family = AF_UNSPEC;
     ai_hints.ai_flags = AI_NUMERICHOST;
 
-	rt = getaddrinfo(pcap_dev, NULL, &ai_hints, &ai_list)	
-    if (rt != 0) {
-        goto error;
-    }
+	rt = getaddrinfo(pcap_dev, NULL, &ai_hints, &ai_list);
+	if (rt != 0) {
+		LOG_ERR_MSG("getaddrinfo: %s\n", gai_strerror(rt));
+		goto error;
+	}
 
     if (pcap_findalldevs(&alldevsp, errbuf)) {
         freeaddrinfo(ai_list);
@@ -626,6 +612,7 @@ void pcap_ip_to_device(char *pcap_dev, size_t len)
             freeaddrinfo(ai_list);
 
             memset(pcap_dev, 0, len);
+
             strlcpy(pcap_dev, devsp->name, len);
 
             pcap_freealldevs(alldevsp);

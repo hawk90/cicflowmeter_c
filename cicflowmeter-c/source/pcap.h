@@ -12,10 +12,10 @@ void PcapTranslateIPToDevice(char *pcap_dev, size_t len);
 
 // TODO what is means?
 /* per packet Pcap vars */
-typedef struct PCAP_PACKET_VARS_
+typedef struct PCAP_PACKET_T_
 {
     uint32_t tenant_id;
-} PCAP_PACKET_VARS;
+} PCAP_PACKET_T;
 
 typedef struct PCAP_IFACE_CONFIG_
 {
