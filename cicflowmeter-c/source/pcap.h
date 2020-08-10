@@ -10,6 +10,7 @@ void PcapTranslateIPToDevice(char *pcap_dev, size_t len);
 
 #define PCAP_IFACE_NAME_LENGTH 128
 
+// TODO what is means?
 /* per packet Pcap vars */
 typedef struct PCAP_PACKET_VARS_
 {
@@ -26,6 +27,6 @@ typedef struct PCAP_IFACE_CONFIG_
     CHECKSUM_VALIDATION_MODE checksum_mode;
     ATOMIC_DECLARE(unsigned int, ref);
     void (*deref_func)(void *);
-} PCAP_IFACE_CONFIG;
+} PCAP_IFACE_CONFIG_T;
 
 #endif /* __SOURCE_PCAP_H__ */

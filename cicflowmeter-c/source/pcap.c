@@ -22,16 +22,14 @@ typedef struct PcapStats64_ {
 /**
  * \brief Structure to hold thread specific variables.
  */
-typedef struct PcapThreadVars_
+typedef struct PCAP_THREAD_T_
 {
-    /* thread specific handle */
     pcap_t *handle;
-    /* handle state */
+
     unsigned char handler_state;
-    time_t last_stats_dump;
+    time_t last_stats;
     int data_link;
 
-    /* counters */
     uint64_t pkts;
     uint64_t bytes;
 
@@ -43,18 +41,18 @@ typedef struct PcapThreadVars_
     TmSlot *slot;
 
     /** callback result -- set if one of the thread module failed. */
-    int callbback_result;
+    int callback_result;
 
     /* pcap buffer size */
-    int pcap_buffer_size;
-    int pcap_snap_len;
+    int buffer_size;
+    int snap_len;
 
-    ChecksumValidationMode checksum_mode;
+    CHECKSUM_VALIDATION_MODE_T checksum_mode;
 
     LIVE_DEVICE *live_dev;
 
-    PcapStats64 last_stats64;
-} PcapThreadVars;
+    PCAP_STATS64_T last_stats64;
+} PCAP_THREAD_T;
 
 #if 0
 static TmEcode ReceivePcapThreadInit(ThreadVars *, const void *, void **);
@@ -122,34 +120,45 @@ static inline void update_pcap_stats64(
     update_pcap_stats_value64(&last_stats->ifdrop, current_stats->ifdrop);
 }
 
-static inline void dump_pcap_counters(PcapThreadVars *ptv)
-{
-    struct PCAP_STAT_T pcap_stats;
-    if (likely((pcap_stats(ptv->pcap_handle, &pcap_s) >= 0))) {
-        update_pcap_stats64(&ptv->last_stats64, &pcap_s);
-
-        set_stats64(ptv->tv, ptv->capture_kernel_packets,
-                ptv->last_stats64.ps_recv);
-        set_stats64(
-                ptv->tv, ptv->capture_kernel_drops, ptv->last_stats64.drop);
-        (void)ATOMIC_SET(ptv->live_dev->drop, ptv->last_stats64.drop);
-        set_stats64(ptv->tv, ptv->capture_kernel_ifdrops,
-                ptv->last_stats64.ifdrop);
-    }
-}
-
-static int open_pcap(PcapThreadVars *ptv)
+static inline int dump_pcap_counters(PCAP_THREAD_T *pcap_vars)
 {
 	int rt = 0;
-    ptv->pcap_state = PCAP_STATE_DOWN;
+    struct pcap_stat stats;
 
-    rt = pcap_activate(ptv->handle);
+	rt = pcap_stats(pcap_vars->handle, &stats);
+	if(rt == PCAP_ERROR) {
+		LOG_ERROR_MSG("%s", pcap_geterr(pcap_vars->handle));
+		goto error;
+	}
+
+	update_pcap_stats64(&pcap_vars->last_stats64, &stats);
+
+	// TODO: StatsSetU64 -> set_stats64 in counters.h
+	set_stats64(pcap_vars->tv, pcap_vars->capture_kernel_packets,
+			pcap_vars->last_stats64.ps_recv);
+	set_stats64(
+			pcap_vars->tv, pcap_vars->capture_kernel_drops, pcap_vars->last_stats64.drop);
+	(void)ATOMIC_SET(pcap_vars->live_dev->drop, pcap_vars->last_stats64.drop);
+	set_stats64(pcap_vars->tv, pcap_vars->capture_kernel_ifdrops,
+			pcap_vars->last_stats64.ifdrop);
+
+	return 0;
+error:
+	return -1;
+}
+
+static int open_pcap(PCAP_THREAD_T *pcap_vars)
+{
+	int rt = 0;
+    pcap_vars->pcap_state = PCAP_STATE_DOWN;
+
+    rt = pcap_activate(pcap_vars->handle);
     if (rt == PCAP_WARNING_PROMISC_NOTSUP) {
 		LOG_WARN_MSG();
 		return rt;
     } else if (rt == PCAP_WARNING_TSTAMP_TYPE_NOTSUP) {
 	} else if (rt == PACAP_WARNING) {
-		LOG_WARN_MSG("%s", pcap_geterr(ptv->handle));
+		LOG_WARN_MSG("%s", pcap_geterr(pcap_vars->handle));
 	} else if (rt == PCAP_ERROR_ACTIVATED) {
 
 	} else if (rt == PCAP_ERROR_NO_SUCH_DEVICE) {
@@ -163,53 +172,55 @@ static int open_pcap(PcapThreadVars *ptv)
 	} else if (rt == PCAP_ERROR_IFACE_NOT_UP) {
 
 	} else if(rt == ERROR) {
-		LOG_ERR_MSG("%s", pcap_geterr(ptv->handle));
+		LOG_ERR_MSG("%s", pcap_geterr(pcap_vars->handle));
 	}
 
-    ptv->state = PCAP_STATE_UP;
+    pcap_vars->state = PCAP_STATE_UP;
 
     LOG_INFO_MSG("Recovering interface listening");
+
     return 0;
 error:
-	pcap_close(ptv->handle);
+	pcap_close(pcap_vars->handle);
 	return rt;
 }
 
-static void PcapCallbackLoop(char *user, struct pcap_pkthdr *h, u_char *pkt)
+static void callback_loop(char *user, const struct pcap_pkthdr *header, const char *bytes)
 {
     SCEnter();
 
-    PcapThreadVars *ptv = (PcapThreadVars *)user;
-    Packet *p = PacketGetFromQueueOrAlloc();
     struct timeval current_time;
+
+    PCAP_THREAD_T *pcap_vars = (PCAP_THREAD_T *)user;
+    Packet *pkt = PacketGetFromQueueOrAlloc();
 
     if (unlikely(p == NULL)) {
         SCReturn;
     }
 
-    PKT_SET_SRC(p, PKT_SRC_WIRE);
-    p->ts.tv_sec = h->ts.tv_sec;
-    p->ts.tv_usec = h->ts.tv_usec;
-    SCLogDebug("p->ts.tv_sec %"PRIuMAX"", (uintmax_t)p->ts.tv_sec);
-    p->datalink = ptv->datalink;
+    set_pkt_src(pkt, PKT_SRC_WIRE);
+    pkt->ts.tv_sec	= h->ts.tv_sec;
+    pkt->ts.tv_usec	= h->ts.tv_usec;
+    pkt->data_link	= pcap_vars->data_link;
 
-    ptv->pkts++;
-    ptv->bytes += h->caplen;
-    (void) SC_ATOMIC_ADD(ptv->livedev->pkts, 1);
-    p->livedev = ptv->livedev;
+    pcap_vars->pkts++;
+    pcap_vars->bytes += h->caplen;
+
+    (void) ATOMIC_ADD(pcap_vars->live_dev->pkts, 1);
+    pkt->live_dev = pcap_vars->live_dev;
 
     if (unlikely(PacketCopyData(p, pkt, h->caplen))) {
-        TmqhOutputPacketpool(ptv->tv, p);
+        TmqhOutputPacketpool(pcap_vars->tv, pkt);
         SCReturn;
     }
 
-    switch (ptv->checksum_mode) {
+    switch (pcap_vars->checksum_mode) {
         case CHECKSUM_VALIDATION_AUTO:
-            if (ChecksumAutoModeCheck(ptv->pkts,
-                        SC_ATOMIC_GET(ptv->livedev->pkts),
-                        SC_ATOMIC_GET(ptv->livedev->invalid_checksums))) {
-                ptv->checksum_mode = CHECKSUM_VALIDATION_DISABLE;
-                p->flags |= PKT_IGNORE_CHECKSUM;
+            if (ChecksumAutoModeCheck(pcap_vars->pkts,
+                        ATOMIC_GET(pcap_vars->livedev->pkts),
+                        ATOMIC_GET(pcap_vars->livedev->invalid_checksums))) {
+                pcap_vars->checksum_mode = CHECKSUM_VALIDATION_DISABLE;
+                pkt->flags |= PKT_IGNORE_CHECKSUM;
             }
             break;
         case CHECKSUM_VALIDATION_DISABLE:
@@ -219,16 +230,18 @@ static void PcapCallbackLoop(char *user, struct pcap_pkthdr *h, u_char *pkt)
             break;
     }
 
-    if (TmThreadsSlotProcessPkt(ptv->tv, ptv->slot, p) != TM_ECODE_OK) {
-        pcap_breakloop(ptv->pcap_handle);
-        ptv->cb_result = TM_ECODE_FAILED;
+#if 0
+    if (TmThreadsSlotProcessPkt(pcap_vars->tv, pcap_vars->slot, p) != TM_ECODE_OK) {
+        pcap_breakloop(pcap_vars->pcap_handle);
+        pcap_vars->cb_result = TM_ECODE_FAILED;
     }
+#endif 
 
     /* Trigger one dump of stats every second */
-    TimeGet(&current_time);
-    if (current_time.tv_sec != ptv->last_stats_dump) {
-        PcapDumpCounters(ptv);
-        ptv->last_stats_dump = current_time.tv_sec;
+    get_time(&current_time);
+    if (current_time.tv_sec != pcap_vars->last_stats) {
+        dump_pcap_counters(pcap_vars);
+        pcap_vars->last_stats = current_time.tv_sec;
     }
 
     SCReturn;
@@ -241,16 +254,17 @@ static void PcapCallbackLoop(char *user, struct pcap_pkthdr *h, u_char *pkt)
 /**
  *  \brief Main PCAP reading Loop function
  */
-static TmEcode ReceivePcapLoop(ThreadVars *tv, void *data, void *slot)
+static TmEcode receive_pcap_loop(ThreadVars *tv, void *data, void *slot)
 {
     SCEnter();
 
-    int packet_q_len = 64;
-    PcapThreadVars *ptv = (PcapThreadVars *)data;
+	int rt = 0;
+    int packet_queue_len = 64;
+    PCAP_THREAD_T *pcap_vars = (PCAP_THREAD_T *)data;
     TmSlot *s = (TmSlot *)slot;
 
-    ptv->slot = s->slot_next;
-    ptv->cb_result = TM_ECODE_OK;
+    pcap_vars->slot = s->slot_next;
+    pcap_vars->cb_result = TM_ECODE_OK;
 
     while (1) {
         if (suricata_ctl_flags & SURICATA_STOP) {
@@ -259,39 +273,39 @@ static TmEcode ReceivePcapLoop(ThreadVars *tv, void *data, void *slot)
 
         /* make sure we have at least one packet in the packet pool, to prevent
          * us from alloc'ing packets at line rate */
-        PacketPoolWait();
+        wait_packet_pool();
 
-        int r = pcap_dispatch(ptv->pcap_handle, packet_q_len,
-                          (pcap_handler)PcapCallbackLoop, (u_char *)ptv);
-        if (unlikely(r == 0 || r == PCAP_ERROR_BREAK)) {
-            if (r == PCAP_ERROR_BREAK && ptv->cb_result == TM_ECODE_FAILED) {
+        rt = pcap_dispatch(pcap_vars->pcap_handle, packet_queue_len,
+                          (pcap_handler)PcapCallbackLoop, (u_char *)pcap_vars);
+        if (unlikely(rt == 0 || rt == PCAP_ERROR_BREAK)) {
+            if (rt == PCAP_ERROR_BREAK && pcap_vars->cb_result == TM_ECODE_FAILED) {
                 SCReturnInt(TM_ECODE_FAILED);
             }
             TmThreadsCaptureHandleTimeout(tv, NULL);
-        } else if (unlikely(r < 0)) {
+        } else if (unlikely(rt < 0)) {
             int dbreak = 0;
             SCLogError(SC_ERR_PCAP_DISPATCH, "error code %" PRId32 " %s",
-                       r, pcap_geterr(ptv->pcap_handle));
+                       r, pcap_geterr(pcap_vars->pcap_handle));
             do {
                 usleep(PCAP_RECONNECT_TIMEOUT);
                 if (suricata_ctl_flags != 0) {
                     dbreak = 1;
                     break;
                 }
-                r = PcapTryReopen(ptv);
-            } while (r < 0);
+                r = PcapTryReopen(pcap_vars);
+            } while (rt < 0);
             if (dbreak) {
                 break;
             }
-        } else if (ptv->cb_result == TM_ECODE_FAILED) {
-            SCLogError(SC_ERR_PCAP_DISPATCH, "Pcap callback PcapCallbackLoop failed");
+        } else if (pcap_vars->cb_result == TM_ECODE_FAILED) {
+            LOG_ERR_MSG(ERR_PCAP_DISPATCH, "Pcap callback PcapCallbackLoop failed");
             SCReturnInt(TM_ECODE_FAILED);
         }
 
         StatsSyncCountersIfSignalled(tv);
     }
 
-    PcapDumpCounters(ptv);
+    PcapDumpCounters(pcap_vars);
     StatsSyncCountersIfSignalled(tv);
     SCReturnInt(TM_ECODE_OK);
 }
@@ -299,14 +313,14 @@ static TmEcode ReceivePcapLoop(ThreadVars *tv, void *data, void *slot)
 /**
  * \brief PCAP Break Loop function.
  */
-static TmEcode ReceivePcapBreakLoop(ThreadVars *tv, void *data)
+static TmEcode receive_pcap_breakloop(ThreadVars *tv, void *data)
 {
     SCEnter();
-    PcapThreadVars *ptv = (PcapThreadVars *)data;
-    if (ptv->pcap_handle == NULL) {
+    PCAP_THREAD_T *pcap_vars = (PCAP_THREAD_T *)data;
+    if (pcap_vars->pcap_handle == NULL) {
         SCReturnInt(TM_ECODE_FAILED);
     }
-    pcap_breakloop(ptv->pcap_handle);
+    pcap_breakloop(pcap_vars->pcap_handle);
     SCReturnInt(TM_ECODE_OK);
 }
 
@@ -321,7 +335,7 @@ static TmEcode ReceivePcapBreakLoop(ThreadVars *tv, void *data)
  *
  * \param tv pointer to ThreadVars
  * \param initdata pointer to the interface passed from the user
- * \param data pointer gets populated with PcapThreadVars
+ * \param data pointer gets populated with PCAP_THREAD_T
  *
  * \todo Create a general pcap setup function.
  */
@@ -335,18 +349,18 @@ static TmEcode ReceivePcapThreadInit(ThreadVars *tv, const void *initdata, void 
         SCReturnInt(TM_ECODE_FAILED);
     }
 
-    PcapThreadVars *ptv = SCCalloc(1, sizeof(PcapThreadVars));
-    if (unlikely(ptv == NULL)) {
+    PCAP_THREAD_T *pcap_vars = SCCalloc(1, sizeof(PCAP_THREAD_T));
+    if (unlikely(pcap_vars == NULL)) {
         pcapconfig->DerefFunc(pcapconfig);
         SCReturnInt(TM_ECODE_FAILED);
     }
 
-    ptv->tv = tv;
+    pcap_vars->tv = tv;
 
-    ptv->livedev = LiveGetDevice(pcapconfig->iface);
-    if (ptv->livedev == NULL) {
+    pcap_vars->livedev = LiveGetDevice(pcapconfig->iface);
+    if (pcap_vars->livedev == NULL) {
         SCLogError(SC_ERR_INVALID_VALUE, "unable to find Live device");
-        SCFree(ptv);
+        SCFree(pcap_vars);
         SCReturnInt(TM_ECODE_FAILED);
     }
     SCLogInfo("using interface %s", (char *)pcapconfig->iface);
@@ -354,18 +368,18 @@ static TmEcode ReceivePcapThreadInit(ThreadVars *tv, const void *initdata, void 
     if (LiveGetOffload() == 0) {
         (void)GetIfaceOffloading((char *)pcapconfig->iface, 1, 1);
     } else {
-        DisableIfaceOffloading(ptv->livedev, 1, 1);
+        DisableIfaceOffloading(pcap_vars->livedev, 1, 1);
     }
 
-    ptv->checksum_mode = pcapconfig->checksum_mode;
-    if (ptv->checksum_mode == CHECKSUM_VALIDATION_AUTO) {
+    pcap_vars->checksum_mode = pcapconfig->checksum_mode;
+    if (pcap_vars->checksum_mode == CHECKSUM_VALIDATION_AUTO) {
         SCLogInfo("running in 'auto' checksum mode. Detection of interface "
                 "state will require " xstr(CHECKSUM_SAMPLE_COUNT) " packets");
     }
 
     char errbuf[PCAP_ERRBUF_SIZE];
-    ptv->pcap_handle = pcap_create((char *)pcapconfig->iface, errbuf);
-    if (ptv->pcap_handle == NULL) {
+    pcap_vars->pcap_handle = pcap_create((char *)pcapconfig->iface, errbuf);
+    if (pcap_vars->pcap_handle == NULL) {
         if (strlen(errbuf)) {
             SCLogError(SC_ERR_PCAP_CREATE, "could not create a new "
                     "pcap handler for %s, error %s",
@@ -375,61 +389,61 @@ static TmEcode ReceivePcapThreadInit(ThreadVars *tv, const void *initdata, void 
                     "pcap handler for %s",
                     (char *)pcapconfig->iface);
         }
-        SCFree(ptv);
+        SCFree(pcap_vars);
         pcapconfig->DerefFunc(pcapconfig);
         SCReturnInt(TM_ECODE_FAILED);
     }
 
     if (pcapconfig->snaplen == 0) {
         /* We set snaplen if we can get the MTU */
-        ptv->pcap_snaplen = GetIfaceMaxPacketSize(pcapconfig->iface);
+        pcap_vars->pcap_snaplen = GetIfaceMaxPacketSize(pcapconfig->iface);
     } else {
-        ptv->pcap_snaplen = pcapconfig->snaplen;
+        pcap_vars->pcap_snaplen = pcapconfig->snaplen;
     }
-    if (ptv->pcap_snaplen > 0) {
+    if (pcap_vars->pcap_snaplen > 0) {
         /* set Snaplen. Must be called before pcap_activate */
-        int pcap_set_snaplen_r = pcap_set_snaplen(ptv->pcap_handle, ptv->pcap_snaplen);
+        int pcap_set_snaplen_r = pcap_set_snaplen(pcap_vars->pcap_handle, pcap_vars->pcap_snaplen);
         if (pcap_set_snaplen_r != 0) {
             SCLogError(SC_ERR_PCAP_SET_SNAPLEN, "could not set snaplen, "
-                    "error: %s", pcap_geterr(ptv->pcap_handle));
-            SCFree(ptv);
+                    "error: %s", pcap_geterr(pcap_vars->pcap_handle));
+            SCFree(pcap_vars);
             pcapconfig->DerefFunc(pcapconfig);
             SCReturnInt(TM_ECODE_FAILED);
         }
-        SCLogInfo("Set snaplen to %d for '%s'", ptv->pcap_snaplen,
+        SCLogInfo("Set snaplen to %d for '%s'", pcap_vars->pcap_snaplen,
                   pcapconfig->iface);
     }
 
     /* set Promisc, and Timeout. Must be called before pcap_activate */
-    int pcap_set_promisc_r = pcap_set_promisc(ptv->pcap_handle, pcapconfig->promisc);
+    int pcap_set_promisc_r = pcap_set_promisc(pcap_vars->pcap_handle, pcapconfig->promisc);
     if (pcap_set_promisc_r != 0) {
         SCLogError(SC_ERR_PCAP_SET_PROMISC, "could not set promisc mode, "
-                "error %s", pcap_geterr(ptv->pcap_handle));
-        SCFree(ptv);
+                "error %s", pcap_geterr(pcap_vars->pcap_handle));
+        SCFree(pcap_vars);
         pcapconfig->DerefFunc(pcapconfig);
         SCReturnInt(TM_ECODE_FAILED);
     }
 
-    int pcap_set_timeout_r = pcap_set_timeout(ptv->pcap_handle, LIBPCAP_COPYWAIT);
+    int pcap_set_timeout_r = pcap_set_timeout(pcap_vars->pcap_handle, LIBPCAP_COPYWAIT);
     if (pcap_set_timeout_r != 0) {
         SCLogError(SC_ERR_PCAP_SET_TIMEOUT, "could not set timeout, "
-                "error %s", pcap_geterr(ptv->pcap_handle));
-        SCFree(ptv);
+                "error %s", pcap_geterr(pcap_vars->pcap_handle));
+        SCFree(pcap_vars);
         pcapconfig->DerefFunc(pcapconfig);
         SCReturnInt(TM_ECODE_FAILED);
     }
 #ifdef HAVE_PCAP_SET_BUFF
-    ptv->pcap_buffer_size = pcapconfig->buffer_size;
-    if (ptv->pcap_buffer_size > 0) {
+    pcap_vars->pcap_buffer_size = pcapconfig->buffer_size;
+    if (pcap_vars->pcap_buffer_size > 0) {
         SCLogInfo("going to use pcap buffer size of %" PRId32,
-                ptv->pcap_buffer_size);
+                pcap_vars->pcap_buffer_size);
 
-        int pcap_set_buffer_size_r = pcap_set_buffer_size(ptv->pcap_handle,
-                ptv->pcap_buffer_size);
+        int pcap_set_buffer_size_r = pcap_set_buffer_size(pcap_vars->pcap_handle,
+                pcap_vars->pcap_buffer_size);
         if (pcap_set_buffer_size_r != 0) {
             SCLogError(SC_ERR_PCAP_SET_BUFF_SIZE, "could not set "
-                    "pcap buffer size, error %s", pcap_geterr(ptv->pcap_handle));
-            SCFree(ptv);
+                    "pcap buffer size, error %s", pcap_geterr(pcap_vars->pcap_handle));
+            SCFree(pcap_vars);
             pcapconfig->DerefFunc(pcapconfig);
             SCReturnInt(TM_ECODE_FAILED);
         }
@@ -437,84 +451,53 @@ static TmEcode ReceivePcapThreadInit(ThreadVars *tv, const void *initdata, void 
 #endif /* HAVE_PCAP_SET_BUFF */
 
     /* activate the handle */
-    int pcap_activate_r = pcap_activate(ptv->pcap_handle);
+    int pcap_activate_r = pcap_activate(pcap_vars->pcap_handle);
     if (pcap_activate_r != 0) {
         SCLogError(SC_ERR_PCAP_ACTIVATE_HANDLE, "could not activate the "
-                "pcap handler, error %s", pcap_geterr(ptv->pcap_handle));
-        SCFree(ptv);
+                "pcap handler, error %s", pcap_geterr(pcap_vars->pcap_handle));
+        SCFree(pcap_vars);
         pcapconfig->DerefFunc(pcapconfig);
         SCReturnInt(TM_ECODE_FAILED);
     }
-    ptv->pcap_state = PCAP_STATE_UP;
-
-    /* set bpf filter if we have one */
-    if (pcapconfig->bpf_filter) {
-        SCMutexLock(&pcap_bpf_compile_lock);
-
-        ptv->bpf_filter = pcapconfig->bpf_filter;
-
-        if (pcap_compile(ptv->pcap_handle, &ptv->filter,
-                    (char *)ptv->bpf_filter, 1, 0) < 0)
-        {
-            SCLogError(SC_ERR_BPF, "bpf compilation error %s",
-                    pcap_geterr(ptv->pcap_handle));
-
-            SCMutexUnlock(&pcap_bpf_compile_lock);
-            SCFree(ptv);
-            pcapconfig->DerefFunc(pcapconfig);
-            return TM_ECODE_FAILED;
-        }
-
-        if (pcap_setfilter(ptv->pcap_handle, &ptv->filter) < 0) {
-            SCLogError(SC_ERR_BPF, "could not set bpf filter %s",
-                    pcap_geterr(ptv->pcap_handle));
-
-            SCMutexUnlock(&pcap_bpf_compile_lock);
-            SCFree(ptv);
-            pcapconfig->DerefFunc(pcapconfig);
-            return TM_ECODE_FAILED;
-        }
-
-        SCMutexUnlock(&pcap_bpf_compile_lock);
-    }
+    pcap_vars->pcap_state = PCAP_STATE_UP;
 
     /* no offloading supported at all */
     (void)GetIfaceOffloading(pcapconfig->iface, 1, 1);
 
-    ptv->datalink = pcap_datalink(ptv->pcap_handle);
+    pcap_vars->datalink = pcap_datalink(pcap_vars->pcap_handle);
 
     pcapconfig->DerefFunc(pcapconfig);
 
-    ptv->capture_kernel_packets = StatsRegisterCounter("capture.kernel_packets",
-            ptv->tv);
-    ptv->capture_kernel_drops = StatsRegisterCounter("capture.kernel_drops",
-            ptv->tv);
-    ptv->capture_kernel_ifdrops = StatsRegisterCounter("capture.kernel_ifdrops",
-            ptv->tv);
+    pcap_vars->capture_kernel_packets = StatsRegisterCounter("capture.kernel_packets",
+            pcap_vars->tv);
+    pcap_vars->capture_kernel_drops = StatsRegisterCounter("capture.kernel_drops",
+            pcap_vars->tv);
+    pcap_vars->capture_kernel_ifdrops = StatsRegisterCounter("capture.kernel_ifdrops",
+            pcap_vars->tv);
 
-    *data = (void *)ptv;
+    *data = (void *)pcap_vars;
     SCReturnInt(TM_ECODE_OK);
 }
 
 /**
  * \brief This function prints stats to the screen at exit.
  * \param tv pointer to ThreadVars
- * \param data pointer that gets cast into PcapThreadVars for ptv
+ * \param data pointer that gets cast into PCAP_THREAD_T for pcap_vars
  */
 static void ReceivePcapThreadExitStats(ThreadVars *tv, void *data)
 {
     SCEnter();
-    PcapThreadVars *ptv = (PcapThreadVars *)data;
+    PCAP_THREAD_T *pcap_vars = (PCAP_THREAD_T *)data;
     struct pcap_stat pcap_s;
 
-    if (pcap_stats(ptv->pcap_handle, &pcap_s) < 0) {
+    if (pcap_stats(pcap_vars->pcap_handle, &pcap_s) < 0) {
         SCLogError(SC_ERR_STAT,"(%s) Failed to get pcap_stats: %s",
-                tv->name, pcap_geterr(ptv->pcap_handle));
+                tv->name, pcap_geterr(pcap_vars->pcap_handle));
         SCLogInfo("(%s) Packets %" PRIu64 ", bytes %" PRIu64 "", tv->name,
-                ptv->pkts, ptv->bytes);
+                pcap_vars->pkts, pcap_vars->bytes);
     } else {
         SCLogInfo("(%s) Packets %" PRIu64 ", bytes %" PRIu64 "", tv->name,
-                ptv->pkts, ptv->bytes);
+                pcap_vars->pkts, pcap_vars->bytes);
 
         /* these numbers are not entirely accurate as ps_recv contains packets
          * that are still waiting to be processed at exit. ps_drop only contains
@@ -524,18 +507,18 @@ static void ReceivePcapThreadExitStats(ThreadVars *tv, void *data)
          * Note: ps_recv includes dropped packets and should be considered total.
          * Unless we start to look at ps_ifdrop which isn't supported everywhere.
          */
-        UpdatePcapStats64(&ptv->last_stats64, &pcap_s);
+        UpdatePcapStats64(&pcap_vars->last_stats64, &pcap_s);
         float drop_percent =
-                likely(ptv->last_stats64.ps_recv > 0)
-                        ? (((float)ptv->last_stats64.ps_drop) /
-                                  (float)ptv->last_stats64.ps_recv) *
+                likely(pcap_vars->last_stats64.ps_recv > 0)
+                        ? (((float)pcap_vars->last_stats64.ps_drop) /
+                                  (float)pcap_vars->last_stats64.ps_recv) *
                                   100
                         : 0;
         SCLogInfo("(%s) Pcap Total:%" PRIu64 " Recv:%" PRIu64 " Drop:%" PRIu64
                   " (%02.1f%%).",
-                tv->name, ptv->last_stats64.ps_recv,
-                ptv->last_stats64.ps_recv - ptv->last_stats64.ps_drop,
-                ptv->last_stats64.ps_drop, drop_percent);
+                tv->name, pcap_vars->last_stats64.ps_recv,
+                pcap_vars->last_stats64.ps_recv - pcap_vars->last_stats64.ps_drop,
+                pcap_vars->last_stats64.ps_drop, drop_percent);
     }
 }
 
@@ -547,7 +530,7 @@ static void ReceivePcapThreadExitStats(ThreadVars *tv, void *data)
  *
  * \param t pointer to ThreadVars
  * \param p pointer to the current packet
- * \param data pointer that gets cast into PcapThreadVars for ptv
+ * \param data pointer that gets cast into PCAP_THREAD_T for pcap_vars
  */
 static TmEcode decode_pcap(ThreadVars *tv, Packet *p, void *data)
 {
