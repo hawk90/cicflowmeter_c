@@ -469,7 +469,7 @@ static TmEcode ReceivePcapThreadInit(ThreadVars *tv, const void *initdata, void 
  * \param tv pointer to ThreadVars
  * \param data pointer that gets cast into PCAP_THREAD_T for pcap_vars
  */
-static void ReceivePcapThreadExitStats(ThreadVars *tv, void *data)
+static void receive_pcap_thread_exit_stats(THREAD_T *thread, void *data)
 {
     SCEnter();
     PCAP_THREAD_T *pcap_vars = (PCAP_THREAD_T *)data;
@@ -517,34 +517,36 @@ static void ReceivePcapThreadExitStats(ThreadVars *tv, void *data)
  * \param p pointer to the current packet
  * \param data pointer that gets cast into PCAP_THREAD_T for pcap_vars
  */
-static TmEcode decode_pcap(ThreadVars *tv, Packet *p, void *data)
+static TmEcode decode_pcap(THREAD_T *thread, PACKET *pkt, void *data)
 {
     SCEnter();
-    DecodeThreadVars *dtv = (DecodeThreadVars *)data;
+    DECODE_THREAD_T *decode_thread = (DECODE_THREAD_T *)data;
 
     BUG_ON(PKT_IS_PSEUDOPKT(p));
 
     /* update counters */
-    DecodeUpdatePacketCounters(tv, dtv, p);
+    update_decode_packet_counters(thread, decode_thread, pkt);
 
-    DecodeLinkLayer(tv, dtv, p->datalink, p, GET_PKT_DATA(p), GET_PKT_LEN(p));
+    decode_link_layer(thread, decode_thread, pkt->data_link, pkt, GET_PKT_DATA(pkt), GET_PKT_LEN(pkt));
 
-    PacketDecodeFinalize(tv, dtv, p);
+    finalize_decode_packet(thread, decode, pkt);
 
-    SCReturnInt(TM_ECODE_OK);
+    ReturnInt(TM_ECODE_OK);
 }
 
-static TmEcode init_decode_pcap_thread(ThreadVars *thread_var, const void *init_data, void **data)
+static TmEcode init_decode_pcap_thread(THREAD_T *thread, const void *init_data, void **data)
 {
     SCEnter();
 
-    DECODE_THREAD_VARS *decode_thread_var = alloc_decode_thread_vars(thread_var);
-    if (ddecode_thread_var == NULL)
+    DECODE_THREAD_T *decode_thread = alloc_decode_thread_vars(thread);
+    if (ddecode_thread == NULL) {
+
 		goto error;
+	}
 
     DecodeRegisterPerfCounters(dtv, tv);
 
-    *data = (void *)dtv;
+    *data = (void *)decode_thread;
 
     ReturnInt(TM_ECODE_OK);
 error:
@@ -557,7 +559,7 @@ static TmEcode deinit_decode_pcap_thread(ThreadVars *thread_var, void *data)
 
     if (data != NULL)
         free_decode_thread_vars(thread_var, data);
-    SCReturnInt(TM_ECODE_OK);
+    ReturnInt(TM_ECODE_OK);
 }
 
 void pcap_ip_to_device(char *pcap_dev, size_t len)
