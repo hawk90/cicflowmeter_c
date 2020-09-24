@@ -2,7 +2,7 @@
 
 #define ERROR_CASE(E) case E: return #E
 
-const char *error_to_string(ERROR_CODE error_code)
+const char *error_to_string(ERROR_CODE_T error_code)
 {
     switch(error_code) {
 		ERROR_CASE (ERROR_NONE);

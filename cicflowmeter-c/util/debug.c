@@ -19,13 +19,13 @@ MAP g_log_level_map[ ] = {
 };
 
 struct LOG_CONFIG {
-	LOG_TYPE log_type;
+	LOG_TYPE_T log_type;
 	FILE *fd;
 	pthread_mutex_t mutex;
 	uint32_t color;
-} ;
+}LOG_CONFIG_T ;
 
-static struct LOG_CONFIG g_log_config;
+static struct LOG_CONFIG_T g_log_config;
 
 /**
  * \brief Adds the global log_format to the outgoing buffer
@@ -40,7 +40,7 @@ static struct LOG_CONFIG g_log_config;
  */
 static ERROR_CODE get_fmt_log_message_buffer(
 		struct timeval *tval, char *buffer, size_t buffer_size, const char *log_format,
-		const LOG_LEVEL log_level, const char *file, const char *function, const uint32_t line,	const ERROR_CODE error_code, const char *message)
+		const LOG_LEVEL_T log_level, const char *file, const char *function, const uint32_t line,	const ERROR_CODE error_code, const char *message)
 {
     char *temp = buffer;
     const char *s = NULL;
@@ -135,7 +135,7 @@ static ERROR_CODE get_fmt_log_message_buffer(
 #endif
                 break;
 
-            case LOG_FMT_LOG_LEVEL:
+            case LOG_FMT_LOG_LEVEL_T:
                 temp_fmt[0] = '\0';
                 s = get_map_key(log_level, g_log_level_map);
                 if (s != NULL) {
@@ -262,7 +262,7 @@ error:
 	return -1;
 }
 
-ERROR_CODE print_log(const LOG_LEVEL log_level, const char *file, const char *func, const uint32_t line, ERROR_CODE error_code, const char *message)
+ERROR_CODE print_log(const LOG_LEVEL_T log_level, const char *file, const char *func, const uint32_t line, ERROR_CODE error_code, const char *message)
 {	
 	char buffer[MAX_LOG_MSG_LEN] = "";
 	struct timeval tval;
@@ -277,10 +277,10 @@ ERROR_CODE print_log(const LOG_LEVEL log_level, const char *file, const char *fu
 	if (rt != 0) goto error;
 
 	switch (g_log_config.log_type) {
-		case LOG_TYPE_STREAM:
+		case LOG_TYPE_T_STREAM:
 			flush_log_buffer(stdout, buffer);
 			break;
-		case LOG_TYPE_FILE:
+		case LOG_TYPE_T_FILE:
 			pthread_mutex_lock(&(g_log_config.mutex));
 
 			/* Ciritical Session */
@@ -290,7 +290,7 @@ ERROR_CODE print_log(const LOG_LEVEL log_level, const char *file, const char *fu
 
 			pthread_mutex_unlock(&(g_log_config.mutex));
 			break;
-		case LOG_TYPE_STREAM_AND_FILE:
+		case LOG_TYPE_T_STREAM_AND_FILE:
 			break;
 		default:
 			goto error;
@@ -299,7 +299,7 @@ error:
 	return OK;
 }
 
-void logger(const LOG_LEVEL log_level, const char *file, const char *func,
+void logger(const LOG_LEVEL_T log_level, const char *file, const char *func,
 			const uint32_t line, ERROR_CODE error_code, const char *fmt, ...)
 {
 	if (log_level >= LOG_DEBUG) {
@@ -317,7 +317,7 @@ void logger(const LOG_LEVEL log_level, const char *file, const char *func,
 
 int init_log_config()
 {
-	g_log_config.log_type = LOG_TYPE_STREAM;
+	g_log_config.log_type = LOG_TYPE_T_STREAM;
 	g_log_config.fd = NULL;
 	pthread_mutex_init(&(g_log_config.mutex), NULL);
 
