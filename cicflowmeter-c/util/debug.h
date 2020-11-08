@@ -30,13 +30,13 @@ typedef enum {
     LOG_ALERT,			/* */
     LOG_EMERGENCY,		/* */
     LOG_LEVEL_MAX,		/* */
-} LOG_LEVEL;
+} LOG_LEVEL_T;
 
 typedef enum {
 	LOG_TYPE_STREAM	= 0,
 	LOG_TYPE_FILE,
 	LOG_TYPE_STREAM_AND_FILE,
-} LOG_TYPE;	/* LogOPIface and LogOPType */
+} LOG_TYPE_T;	/* LogOPIface and LogOPType */
 
 
 #define MAX_LOG_MSG_LEN 2048		/* The maximum length of the log message */
@@ -69,7 +69,7 @@ typedef enum {
 #define LOG_FMT_FUNCTION         'n' /* Function */
 
 
-void logger(const LOG_LEVEL log_level, const char *file, const char *func, const uint32_t line, const ERROR_CODE error_code, const char *fmt, ...) CHECK_PRINTF(6, 7);
+void logger(const LOG_LEVEL_T log_level, const char *file, const char *func, const uint32_t line, const ERROR_CODE error_code, const char *fmt, ...) CHECK_PRINTF(6, 7);
 
 #define LOG_TRACE_MSG(...) logger(LOG_TRACE, __FILE__, __func__, __LINE__, ERROR_NONE,  __VA_ARGS__)
 #define LOG_DBG_MSG(...) logger(LOG_DEBUG, __FILE__, __func__, __LINE__, ERROR_NONE, __VA_ARGS__)
@@ -81,7 +81,7 @@ void logger(const LOG_LEVEL log_level, const char *file, const char *func, const
 #define LOG_ALERT_MSG(error_code, ...) logger(LOG_ALERT, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
 #define LOG_MERG_MSG(error_code, ...) logger(LOG_EMERGENCY, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
 
-extern LOG_LEVEL g_log_level;
+extern LOG_LEVEL_T g_log_level;
 
 #ifdef __cplusplus
 }

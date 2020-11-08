@@ -21,10 +21,10 @@ typedef enum {
 
 	/* error max */
 	ERROR_CODE_MAX
-} ERROR_CODE;
+} ERROR_CODE_T;
 
 
-const char *error_to_string(ERROR_CODE error_code);
+const char *error_to_string(ERROR_CODE_T error_code);
 #ifdef __cplusplus
 }
 #endif

@@ -3,7 +3,7 @@
 #include "enum.h"
 #include "debug.h"
 
-int get_map_value(const char *key, MAP *map)
+int get_map_value(const char *key, MAP_T *map)
 {
     int result = -1;
 
@@ -24,7 +24,7 @@ error:
 }
 
 
-const char *get_map_key(int value, MAP *map)
+const char *get_map_key(int value, MAP_T *map)
 {
     if (map == NULL) goto error;
 

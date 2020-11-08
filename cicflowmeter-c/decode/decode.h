@@ -168,23 +168,23 @@ typedef uint16_t Port;
 
 /*Given a packet pkt offset to the start of the ip header in a packet
  *We determine the ip version. */
-#define IP_GET_RAW_VER(pkt) ((((pkt)[0] & 0xf0) >> 4))
+#define GET_IP_RAW_VER(pkt) ((((pkt)[0] & 0xf0) >> 4))
 
-#define PKT_IS_IPV4(p)      (((p)->ip4h != NULL))
-#define PKT_IS_IPV6(p)      (((p)->ip6h != NULL))
-#define PKT_IS_TCP(p)       (((p)->tcph != NULL))
-#define PKT_IS_UDP(p)       (((p)->udph != NULL))
-#define PKT_IS_ICMPV4(p)    (((p)->icmpv4h != NULL))
-#define PKT_IS_ICMPV6(p)    (((p)->icmpv6h != NULL))
-#define PKT_IS_TOSERVER(p)  (((p)->flowflags & FLOW_PKT_TOSERVER))
-#define PKT_IS_TOCLIENT(p)  (((p)->flowflags & FLOW_PKT_TOCLIENT))
+#define IS_IPV4(p)      (((p)->ip4h != NULL))
+#define IS_IPV6(p)      (((p)->ip6h != NULL))
+#define IS_TCP(p)       (((p)->tcph != NULL))
+#define IS_UDP(p)       (((p)->udph != NULL))
+#define IS_ICMPV4(p)    (((p)->icmpv4h != NULL))
+#define IS_ICMPV6(p)    (((p)->icmpv6h != NULL))
+#define IS_TOSERVER(p)  (((p)->flowflags & FLOW_PKT_TOSERVER))
+#define IS_TOCLIENT(p)  (((p)->flowflags & FLOW_PKT_TOCLIENT))
 
-#define IPH_IS_VALID(p) (PKT_IS_IPV4((p)) || PKT_IS_IPV6((p)))
+#define IS_VALID_IPH(p) (IS_IPV4((p)) || IS_IPV6((p)))
 
 /* Retrieve proto regardless of IP version */
-#define IP_GET_IPPROTO(p) \
+#define GET_IP_IPPROTO(p) \
     (p->proto ? p->proto : \
-    (PKT_IS_IPV4((p))? IPV4_GET_IPPROTO((p)) : (PKT_IS_IPV6((p))? IPV6_GET_L4PROTO((p)) : 0)))
+    (IS_IPV4((p))? GET_IPV4_IP_PROTO((p)) : (IS_IPV6((p))? GET_IPV6_L4_PROTO((p)) : 0)))
 
 /* structure to store the sids/gids/etc the detection engine
  * found in this packet */
@@ -221,13 +221,13 @@ typedef struct PacketAlerts_ {
 
 /** number of decoder events we support per packet. Power of 2 minus 1
  *  for memory layout */
-#define PACKET_ENGINE_EVENT_MAX 15
+#define PACKET_EVENT_MAX 15
 
 /** data structure to store decoder, defrag and stream events */
-typedef struct PacketEngineEvents_ {
+typedef struct PacketEvents_ {
     uint8_t cnt;                                /**< number of events */
-    uint8_t events[PACKET_ENGINE_EVENT_MAX];   /**< array of events */
-} PacketEngineEvents;
+    uint8_t events[PACKET_EVENT_MAX];   /**< array of events */
+} PacketEvents;
 
 typedef struct PktVar_ {
     uint32_t id;
@@ -238,7 +238,7 @@ typedef struct PktVar_ {
     uint16_t value_len;
     uint8_t *key;
     uint8_t *value;
-} PktVar;
+} PACKT_QUEUE_T;
 
 #ifdef PROFILING
 
@@ -488,7 +488,7 @@ typedef struct Packet_
 #ifdef HAVE_NAPATECH
     NapatechPacketVars ntpv;
 #endif
-} Packet;
+} PACKET_T;
 
 /** highest mtu of the interfaces we monitor */
 extern int g_default_mtu;
@@ -762,16 +762,6 @@ void CaptureStatsSetup(ThreadVars *tv, CaptureStats *s);
 #define IS_TUNNEL_PKT_VERDICTED(p)  (((p)->flags & PKT_TUNNEL_VERDICTED))
 #define SET_TUNNEL_PKT_VERDICTED(p) ((p)->flags |= PKT_TUNNEL_VERDICTED)
 
-enum DecodeTunnelProto {
-    DECODE_TUNNEL_ETHERNET,
-    DECODE_TUNNEL_ERSPANII,
-    DECODE_TUNNEL_ERSPANI,
-    DECODE_TUNNEL_VLAN,
-    DECODE_TUNNEL_IPV4,
-    DECODE_TUNNEL_IPV6,
-    DECODE_TUNNEL_IPV6_TEREDO,  /**< separate protocol for stricter error handling */
-    DECODE_TUNNEL_PPP,
-};
 
 Packet *PacketTunnelPktSetup(ThreadVars *tv, DecodeThreadVars *dtv, Packet *parent,
                              const uint8_t *pkt, uint32_t len, enum DecodeTunnelProto proto);
@@ -800,12 +790,6 @@ void DecodeUpdatePacketCounters(ThreadVars *tv,
 
 /* decoder functions */
 int DecodeEthernet(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodeSll(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodePPP(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodePPPOESession(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodePPPOEDiscovery(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodeTunnel(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t, enum DecodeTunnelProto) WARN_UNUSED;
-int DecodeNull(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
 int DecodeRaw(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
 int DecodeIPV4(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint16_t);
 int DecodeIPV6(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint16_t);
@@ -813,15 +797,6 @@ int DecodeICMPV4(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, ui
 int DecodeICMPV6(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
 int DecodeTCP(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint16_t);
 int DecodeUDP(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint16_t);
-int DecodeSCTP(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint16_t);
-int DecodeGRE(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodeVLAN(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodeIEEE8021ah(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodeVXLAN(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodeMPLS(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodeERSPAN(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodeERSPANTypeI(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
-int DecodeCHDLC(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
 int DecodeTEMPLATE(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *, uint32_t);
 
 #ifdef UNITTESTS
@@ -861,7 +836,7 @@ void DecodeUnregisterCounters(void);
     } while (0)
 
 
-#define ENGINE_SET_EVENT(p, e) do { \
+#define SET_EVENT(p, e) do { \
     SCLogDebug("p %p event %d", (p), e); \
     if ((p)->events.cnt < PACKET_ENGINE_EVENT_MAX) { \
         (p)->events.events[(p)->events.cnt] = e; \
@@ -869,14 +844,14 @@ void DecodeUnregisterCounters(void);
     } \
 } while(0)
 
-#define ENGINE_SET_INVALID_EVENT(p, e) do { \
+#define SET_INVALID_EVENT(p, e) do { \
     p->flags |= PKT_IS_INVALID; \
     ENGINE_SET_EVENT(p, e); \
 } while(0)
 
 
 
-#define ENGINE_ISSET_EVENT(p, e) ({ \
+#define IS_SET_EVENT(p, e) ({ \
     int r = 0; \
     uint8_t u; \
     for (u = 0; u < (p)->events.cnt; u++) { \
@@ -1020,28 +995,6 @@ void DecodeUnregisterCounters(void);
  *
  *  Otherwise, a future packet will issue the verdict.
  */
-static inline bool VerdictTunnelPacket(Packet *p)
-{
-    bool verdict = true;
-    SCMutex *m = p->root ? &p->root->tunnel_mutex : &p->tunnel_mutex;
-    SCMutexLock(m);
-    const uint16_t outstanding = TUNNEL_PKT_TPR(p) - TUNNEL_PKT_RTV(p);
-    SCLogDebug("tunnel: outstanding %u", outstanding);
-
-    /* if there are packets outstanding, we won't verdict this one */
-    if (IS_TUNNEL_ROOT_PKT(p) && !IS_TUNNEL_PKT_VERDICTED(p) && !outstanding) {
-        // verdict
-        SCLogDebug("root %p: verdict", p);
-    } else if (!IS_TUNNEL_ROOT_PKT(p) && outstanding == 1 && p->root && IS_TUNNEL_PKT_VERDICTED(p->root)) {
-        // verdict
-        SCLogDebug("tunnel %p: verdict", p);
-    } else {
-        verdict = false;
-    }
-    SCMutexUnlock(m);
-    return verdict;
-}
-
 static inline void DecodeLinkLayer(ThreadVars *tv, DecodeThreadVars *dtv,
         const int datalink, Packet *p, const uint8_t *data, const uint32_t len)
 {
@@ -1049,22 +1002,6 @@ static inline void DecodeLinkLayer(ThreadVars *tv, DecodeThreadVars *dtv,
     switch (datalink) {
         case LINKTYPE_ETHERNET:
             DecodeEthernet(tv, dtv, p, data, len);
-            break;
-        case LINKTYPE_LINUX_SLL:
-            DecodeSll(tv, dtv, p, data, len);
-            break;
-        case LINKTYPE_PPP:
-            DecodePPP(tv, dtv, p, data, len);
-            break;
-        case LINKTYPE_RAW:
-        case LINKTYPE_GRE_OVER_IP:
-            DecodeRaw(tv, dtv, p, data, len);
-            break;
-        case LINKTYPE_NULL:
-            DecodeNull(tv, dtv, p, data, len);
-            break;
-       case LINKTYPE_CISCO_HDLC:
-            DecodeCHDLC(tv, dtv, p, data, len);
             break;
         default:
             SCLogError(SC_ERR_DATALINK_UNIMPLEMENTED, "datalink type "
@@ -1081,45 +1018,14 @@ static inline bool DecodeNetworkLayer(ThreadVars *tv, DecodeThreadVars *dtv,
     switch (proto) {
         case ETHERNET_TYPE_IP: {
             uint16_t ip_len = (len < USHRT_MAX) ? (uint16_t)len : (uint16_t)USHRT_MAX;
-            DecodeIPV4(tv, dtv, p, data, ip_len);
+            decode_ipv4(tv, dtv, p, data, ip_len);
             break;
         }
         case ETHERNET_TYPE_IPV6: {
             uint16_t ip_len = (len < USHRT_MAX) ? (uint16_t)len : (uint16_t)USHRT_MAX;
-            DecodeIPV6(tv, dtv, p, data, ip_len);
+            decode_ipv6(tv, dtv, p, data, ip_len);
             break;
         }
-        case ETHERNET_TYPE_PPPOE_SESS:
-            DecodePPPOESession(tv, dtv, p, data, len);
-            break;
-        case ETHERNET_TYPE_PPPOE_DISC:
-            DecodePPPOEDiscovery(tv, dtv, p, data, len);
-            break;
-        case ETHERNET_TYPE_VLAN:
-        case ETHERNET_TYPE_8021AD:
-        case ETHERNET_TYPE_8021QINQ:
-            if (p->vlan_idx >= 2) {
-                ENGINE_SET_EVENT(p,VLAN_HEADER_TOO_MANY_LAYERS);
-            } else {
-                DecodeVLAN(tv, dtv, p, data, len);
-            }
-            break;
-        case ETHERNET_TYPE_8021AH:
-            DecodeIEEE8021ah(tv, dtv, p, data, len);
-            break;
-        case ETHERNET_TYPE_ARP:
-            break;
-        case ETHERNET_TYPE_MPLS_UNICAST:
-        case ETHERNET_TYPE_MPLS_MULTICAST:
-            DecodeMPLS(tv, dtv, p, data, len);
-            break;
-        case ETHERNET_TYPE_DCE:
-            if (unlikely(len < ETHERNET_DCE_HEADER_LEN)) {
-                ENGINE_SET_INVALID_EVENT(p, DCE_PKT_TOO_SMALL);
-            } else {
-                DecodeEthernet(tv, dtv, p, data, len);
-            }
-            break;
         default:
             SCLogDebug("unknown ether type: %" PRIx16 "", proto);
             return false;

@@ -8,10 +8,10 @@ extern "C" {
 typedef struct MAP_ {
     const char *key;
     int value;
-} MAP;
+} MAP_T;
 
-int get_map_value(const char *key, MAP *map);
-const char * get_map_key(int value, MAP *map);
+int get_map_value(const char *key, MAP_T *map);
+const char * get_map_key(int value, MAP_T *map);
 
 #ifdef __cplusplus
 }
