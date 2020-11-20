@@ -1,6 +1,10 @@
 #ifndef __CICFLOWMETER_FLOW_FLOW_H__
 #define __CICFLOWMETER_FLOW_FLOW_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "cicflowmeter-c/utils/atomic.h"
 
 #define FLOW_QUIET TRUE
@@ -636,6 +640,10 @@ void *FLOWGetAppState(const FLOW *f);
 uint8_t FLOWGetDisruptionFlags(const FLOW *f, uint8_t flags);
 
 void FLOWHandlePacketUpdate(FLOW *f, Packet *p);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

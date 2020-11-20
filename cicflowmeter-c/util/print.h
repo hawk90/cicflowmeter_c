@@ -1,6 +1,10 @@
 #ifndef __CICFLOWMETER_UTILS_PRINT_H__
 #define __CICFLOWMETER_UTILS_PRINT_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "debug.h"
 
 #define DUMP(buffer, buffer_offset_ptr, buffer_size, ...)                     \
@@ -19,5 +23,9 @@
             }                                                                 \
         }                                                                     \
     } while (0)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

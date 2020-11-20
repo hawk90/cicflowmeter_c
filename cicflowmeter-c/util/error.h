@@ -24,6 +24,7 @@ typedef enum {
 } ERROR_CODE_T;
 
 const char *error_to_string(ERROR_CODE_T error_code);
+
 #ifdef __cplusplus
 }
 #endif

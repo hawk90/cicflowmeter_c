@@ -1,5 +1,9 @@
-#ifndef __SOURCE_PCAP_H__
-#define __SOURCE_PCAP_H__
+#ifndef __CICFLOWMETER_SOURCE_PCAP_H__
+#define __CICFLOWMETER_SOURCE_PCAP_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void TmModuleReceivePcapRegister(void);
 void TmModuleDecodePcapRegister(void);
@@ -27,4 +31,8 @@ typedef struct PCAP_IFACE_CONFIG_ {
     void (*deref_func)(void *);
 } PCAP_IFACE_CONFIG_T;
 
-#endif /* __SOURCE_PCAP_H__ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif

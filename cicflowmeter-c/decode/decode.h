@@ -1,5 +1,9 @@
-#ifndef __DECODE_H__
-#define __DECODE_H__
+#ifndef __CICFLOWMETER_DECODE_DECODE_H__
+#define __CICFLOWMETER_DECODE_DECODE_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 //#define DBG_THREADS
 #define COUNTERS
@@ -1083,4 +1087,8 @@ static inline bool DecodeNetworkLayer(ThreadVars *tv, DecodeThreadVars *dtv,
     return true;
 }
 
-#endif /* __DECODE_H__ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif

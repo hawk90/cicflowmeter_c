@@ -1,6 +1,10 @@
 #ifndef __CICFLOWMETER_UTIL_ATOMIC_H__
 #define __CICFLOWMETER_UTIL_ATOMIC_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdatomic.h>
 
 #define ATOMIC_DECLARE(type, name) _Atomic(type) name##__atomic__
@@ -86,5 +90,9 @@
  *  \retval var value
  */
 #define ATOMIC_SET(name, val) atomic_store(&(name##__atomic__), (val))
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

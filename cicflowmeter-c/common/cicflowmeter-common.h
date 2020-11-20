@@ -1,6 +1,10 @@
 #ifndef __CICFLOWMETER_COMMON_H__
 #define __CICFLOWMETER_COMMON_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define TRUE 1
 #define FALSE 0
 
@@ -336,6 +340,10 @@ char *strptime(const char *__restrict, const char *__restrict,
 
 #ifndef NAME_MAX
 #define NAME_MAX 255
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

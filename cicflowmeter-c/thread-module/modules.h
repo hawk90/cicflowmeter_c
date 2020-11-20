@@ -1,5 +1,9 @@
-#ifndef __TM_MODULES_H__
-#define __TM_MODULES_H__
+#ifndef __CICFLOWMETER_THREAD_MODULE_MODULES_H__
+#define __CICFLOWMETER_THREAD_MODULE_MODULES_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "threadvars.h"
 #include "tm-threads-common.h"
@@ -75,4 +79,8 @@ const char *TmModuleTmmIdToString(TmmId id);
 void TmModuleRunInit(void);
 void TmModuleRunDeInit(void);
 
-#endif /* __TM_MODULES_H__ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif

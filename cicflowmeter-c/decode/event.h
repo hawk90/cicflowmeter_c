@@ -1,5 +1,9 @@
-#ifndef __DECODE_EVENTS_H__
-#define __DECODE_EVENTS_H__
+#ifndef __CICFLOWMETER_DECODE_EVENT_H__
+#define __CICFLOWMETER_DECODE_EVENT_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* packet decoder events */
 enum {
@@ -272,4 +276,8 @@ struct DecodeEvents_ {
 /* +1 for the end of table marker */
 extern const struct DecodeEvents_ DEvents[DECODE_EVENT_MAX + 1];
 
-#endif /* __DECODE_EVENTS_H__ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif
