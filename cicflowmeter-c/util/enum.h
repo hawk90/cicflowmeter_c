@@ -11,7 +11,7 @@ typedef struct MAP_ {
 } MAP_T;
 
 int get_map_value(const char *key, MAP_T *map);
-const char * get_map_key(int value, MAP_T *map);
+const char *get_map_key(int value, MAP_T *map);
 
 #ifdef __cplusplus
 }

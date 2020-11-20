@@ -1,33 +1,38 @@
-#include "util-affinity.h"
-#include "tm-queues.h"
 #include "counters.h"
-#include "threads.h"
 #include "packet-queue.h"
+#include "threads.h"
+#include "tm-queues.h"
+#include "util-affinity.h"
 #include "util-atomic.h"
 
 struct TmSlot_;
 
 /** Thread flags set and read by threads to control the threads */
-#define THREAD_USE                 BIT_U32(0)  /** thread is in use */
-#define THREAD_INIT_DONE           BIT_U32(1)  /** thread initialization done */
-#define THREAD_PAUSE               BIT_U32(2)  /** signal thread to pause itself */
-#define THREAD_PAUSED              BIT_U32(3)  /** the thread is paused atm */
-#define THREAD_KILL                BIT_U32(4)  /** thread has been asked to cleanup and exit */
-#define THREAD_FAILED              BIT_U32(5)  /** thread has encountered an error and failed */
-#define THREAD_CLOSED              BIT_U32(6)  /** thread done, should be joinable */
+#define THREAD_USE BIT_U32(0)       /** thread is in use */
+#define THREAD_INIT_DONE BIT_U32(1) /** thread initialization done */
+#define THREAD_PAUSE BIT_U32(2)     /** signal thread to pause itself */
+#define THREAD_PAUSED BIT_U32(3)    /** the thread is paused atm */
+#define THREAD_KILL                                          \
+    BIT_U32(4) /** thread has been asked to cleanup and exit \
+                */
+#define THREAD_FAILED \
+    BIT_U32(5) /** thread has encountered an error and failed */
+#define THREAD_CLOSED BIT_U32(6) /** thread done, should be joinable */
 /* used to indicate the thread is going through de-init.  Introduced as more
  * of a hack for solving stream-timeout-shutdown.  Is set by the main thread. */
-#define THREAD_DEINIT              BIT_U32(7)
-#define THREAD_RUNNING_DONE        BIT_U32(8)  /** thread has completed running and is entering
-                                         * the de-init phase */
-#define THREAD_KILL_PKTACQ         BIT_U32(9)  /**< flag thread to stop packet acq */
-#define THREAD_FLOW_LOOP           BIT_U32(10) /**< thread is in flow shutdown loop */
+#define THREAD_DEINIT BIT_U32(7)
+#define THREAD_RUNNING_DONE                                     \
+    BIT_U32(8) /** thread has completed running and is entering \
+                * the de-init phase */
+#define THREAD_KILL_PKTACQ BIT_U32(9) /**< flag thread to stop packet acq */
+#define THREAD_FLOW_LOOP BIT_U32(10)  /**< thread is in flow shutdown loop */
 
 /** signal thread's capture method to create a fake packet to force through
  *  the engine. This is to force timely handling of maintenance taks like
  *  rule reloads even if no packets are read by the capture method. */
-#define THREAD_CAPTURE_INJECT_PKT  BIT_U32(11)
-#define THREAD_DEAD                BIT_U32(12) /**< thread has been joined with pthread_join() */
+#define THREAD_CAPTURE_INJECT_PKT BIT_U32(11)
+#define THREAD_DEAD \
+    BIT_U32(12) /**< thread has been joined with pthread_join() */
 
 /** \brief Per thread variable structure */
 typedef struct ThreadVars_ {
@@ -47,8 +52,8 @@ typedef struct ThreadVars_ {
     uint8_t type;
 
     uint16_t cpu_affinity; /** cpu or core number to set affinity to */
-    int thread_priority; /** priority (real time) for this thread. Look at threads.h */
-
+    int thread_priority;   /** priority (real time) for this thread. Look at
+                              threads.h */
 
     /** TmModule::flags for each module part of this thread */
     uint8_t tmm_flags;
@@ -63,7 +68,7 @@ typedef struct ThreadVars_ {
 
     /** incoming queue and handler */
     Tmq *inq;
-    struct Packet_ * (*tmqh_in)(struct ThreadVars_ *);
+    struct Packet_ *(*tmqh_in)(struct ThreadVars_ *);
 
     ATOMIC_DECLARE(uint32_t, flags);
 
@@ -110,10 +115,9 @@ typedef struct ThreadVars_ {
 } THREAD_T;
 
 /** Thread setup flags: */
-#define THREAD_SET_AFFINITY     0x01 /** CPU/Core affinity */
-#define THREAD_SET_PRIORITY     0x02 /** Real time priority */
-#define THREAD_SET_AFFTYPE      0x04 /** Priority and affinity */
-
+#define THREAD_SET_AFFINITY 0x01 /** CPU/Core affinity */
+#define THREAD_SET_PRIORITY 0x02 /** Real time priority */
+#define THREAD_SET_AFFTYPE 0x04  /** Priority and affinity */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

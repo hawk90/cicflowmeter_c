@@ -2,23 +2,20 @@
 
 #include "util/debug.h"
 
-#define NEXT_EX_OK 1
+#define next_ex_ok 1
 
-void hello_print()
-{
-	printf("\n\n");
-	printf("=========================================================================\n");
-	printf("========================       CICFLOWMETER       =======================\n");
-	printf("=========================================================================\n");
-	printf("\n\n");
-
-
+void hello_print() {
+    printf("\n\n");
+    printf("==============================================================\n");
+    printf("=====================     cicflowmete     ====================\n");
+    printf("==============================================================\n");
+    printf("\n\n");
 }
 
 int main(int argc, char *argv[]) {
-	hello_print();
+    hello_print();
 
-	LOG_DBG_MSG("test");
+    LOG_DBG_MSG("test");
 #if 0
 	int rc = 0;
 	const char *dev = "enp0s3";
@@ -45,5 +42,5 @@ int main(int argc, char *argv[]) {
 error:
 #endif
 
-	return -1;
+    return -1;
 }

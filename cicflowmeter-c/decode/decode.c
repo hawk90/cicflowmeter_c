@@ -1,23 +1,23 @@
-#include "suricata-common.h"
-#include "suricata.h"
-#include "conf.h"
 #include "decode.h"
-#include "decode-teredo.h"
-#include "util-debug.h"
-#include "util-mem.h"
 #include "app-layer-detect-proto.h"
 #include "app-layer.h"
-#include "tm-threads.h"
-#include "util-error.h"
-#include "util-print.h"
-#include "tmqh-packetpool.h"
-#include "util-profiling.h"
-#include "pkt-var.h"
-#include "util-mpm-ac.h"
-#include "util-hash-string.h"
-#include "output.h"
-#include "output-flow.h"
+#include "conf.h"
+#include "decode-teredo.h"
 #include "flow-storage.h"
+#include "output-flow.h"
+#include "output.h"
+#include "pkt-var.h"
+#include "suricata-common.h"
+#include "suricata.h"
+#include "tm-threads.h"
+#include "tmqh-packetpool.h"
+#include "util-debug.h"
+#include "util-error.h"
+#include "util-hash-string.h"
+#include "util-mem.h"
+#include "util-mpm-ac.h"
+#include "util-print.h"
+#include "util-profiling.h"
 
 uint32_t default_packet_size = 0;
 extern bool stats_decoder_events;
@@ -25,8 +25,8 @@ extern const char *stats_decoder_events_prefix;
 extern bool stats_stream_events;
 
 int DecodeTunnel(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p,
-        const uint8_t *pkt, uint32_t len, enum DecodeTunnelProto proto)
-{
+                 const uint8_t *pkt, uint32_t len,
+                 enum DecodeTunnelProto proto) {
     switch (proto) {
         case DECODE_TUNNEL_PPP:
             return DecodePPP(tv, dtv, p, pkt, len);
@@ -44,7 +44,9 @@ int DecodeTunnel(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p,
         case DECODE_TUNNEL_ERSPANI:
             return DecodeERSPANTypeI(tv, dtv, p, pkt, len);
         default:
-            SCLogDebug("FIXME: DecodeTunnel: protocol %" PRIu32 " not supported.", proto);
+            SCLogDebug("FIXME: DecodeTunnel: protocol %" PRIu32
+                       " not supported.",
+                       proto);
             break;
     }
     return TM_ECODE_OK;
@@ -53,8 +55,7 @@ int DecodeTunnel(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p,
 /**
  * \brief Return a malloced packet.
  */
-void PacketFree(Packet *p)
-{
+void PacketFree(Packet *p) {
     PACKET_DESTRUCTOR(p);
     SCFree(p);
 }
@@ -66,16 +67,14 @@ void PacketFree(Packet *p)
  * functions when decoding has been successful.
  *
  */
-void PacketDecodeFinalize(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p)
-{
+void PacketDecodeFinalize(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p) {
     if (p->flags & PKT_IS_INVALID) {
         StatsIncr(tv, dtv->counter_invalid);
     }
 }
 
-void PacketUpdateEngineEventCounters(ThreadVars *tv,
-        DecodeThreadVars *dtv, Packet *p)
-{
+void PacketUpdateEngineEventCounters(ThreadVars *tv, DecodeThreadVars *dtv,
+                                     Packet *p) {
     for (uint8_t i = 0; i < p->events.cnt; i++) {
         const uint8_t e = p->events.events[i];
 
@@ -92,8 +91,7 @@ void PacketUpdateEngineEventCounters(ThreadVars *tv,
  *
  * \retval p packet, NULL on error
  */
-Packet *PacketGetFromAlloc(void)
-{
+Packet *PacketGetFromAlloc(void) {
     Packet *p = SCMalloc(SIZE_OF_PACKET);
     if (unlikely(p == NULL)) {
         return NULL;
@@ -113,8 +111,7 @@ Packet *PacketGetFromAlloc(void)
 /**
  * \brief Return a packet to where it was allocated.
  */
-void PacketFreeOrRelease(Packet *p)
-{
+void PacketFreeOrRelease(Packet *p) {
     if (p->flags & PKT_ALLOC)
         PacketFree(p);
     else
@@ -128,8 +125,7 @@ void PacketFreeOrRelease(Packet *p)
  *
  *  \retval p packet, NULL on error
  */
-Packet *PacketGetFromQueueOrAlloc(void)
-{
+Packet *PacketGetFromQueueOrAlloc(void) {
     /* try the pool first */
     Packet *p = PacketPoolGetPacket();
 
@@ -143,9 +139,8 @@ Packet *PacketGetFromQueueOrAlloc(void)
     return p;
 }
 
-inline int PacketCallocExtPkt(Packet *p, int datalen)
-{
-    if (! p->ext_pkt) {
+inline int PacketCallocExtPkt(Packet *p, int datalen) {
+    if (!p->ext_pkt) {
         p->ext_pkt = SCCalloc(1, datalen);
         if (unlikely(p->ext_pkt == NULL)) {
             SET_PKT_LEN(p, 0);
@@ -169,19 +164,18 @@ inline int PacketCallocExtPkt(Packet *p, int datalen)
  *  \param Pointer to the data to copy
  *  \param Length of the data to copy
  */
-inline int PacketCopyDataOffset(Packet *p, uint32_t offset, const uint8_t *data, uint32_t datalen)
-{
+inline int PacketCopyDataOffset(Packet *p, uint32_t offset, const uint8_t *data,
+                                uint32_t datalen) {
     if (unlikely(offset + datalen > MAX_PAYLOAD_SIZE)) {
         /* too big */
         return -1;
     }
 
     /* Do we have already an packet with allocated data */
-    if (! p->ext_pkt) {
+    if (!p->ext_pkt) {
         uint32_t newsize = offset + datalen;
         // check overflow
-        if (newsize < offset)
-            return -1;
+        if (newsize < offset) return -1;
         if (newsize <= default_packet_size) {
             /* data will fit in memory allocated with packet */
             memcpy(GET_PKT_DIRECT_DATA(p) + offset, data, datalen);
@@ -193,7 +187,8 @@ inline int PacketCopyDataOffset(Packet *p, uint32_t offset, const uint8_t *data,
                 return -1;
             }
             /* copy initial data */
-            memcpy(p->ext_pkt, GET_PKT_DIRECT_DATA(p), GET_PKT_DIRECT_MAX_SIZE(p));
+            memcpy(p->ext_pkt, GET_PKT_DIRECT_DATA(p),
+                   GET_PKT_DIRECT_MAX_SIZE(p));
             /* copy data as asked */
             memcpy(p->ext_pkt + offset, data, datalen);
         }
@@ -210,8 +205,7 @@ inline int PacketCopyDataOffset(Packet *p, uint32_t offset, const uint8_t *data,
  *  \param Pointer to the data to copy
  *  \param Length of the data to copy
  */
-inline int PacketCopyData(Packet *p, const uint8_t *pktdata, uint32_t pktlen)
-{
+inline int PacketCopyData(Packet *p, const uint8_t *pktdata, uint32_t pktlen) {
     SET_PKT_LEN(p, (size_t)pktlen);
     return PacketCopyDataOffset(p, 0, pktdata, pktlen);
 }
@@ -226,9 +220,9 @@ inline int PacketCopyData(Packet *p, const uint8_t *pktdata, uint32_t pktlen)
  *
  *  \retval p the pseudo packet or NULL if out of memory
  */
-Packet *PacketTunnelPktSetup(ThreadVars *tv, DecodeThreadVars *dtv, Packet *parent,
-                             const uint8_t *pkt, uint32_t len, enum DecodeTunnelProto proto)
-{
+Packet *PacketTunnelPktSetup(ThreadVars *tv, DecodeThreadVars *dtv,
+                             Packet *parent, const uint8_t *pkt, uint32_t len,
+                             enum DecodeTunnelProto proto) {
     int ret;
 
     SCEnter();
@@ -257,12 +251,10 @@ Packet *PacketTunnelPktSetup(ThreadVars *tv, DecodeThreadVars *dtv, Packet *pare
     /* tell new packet it's part of a tunnel */
     SET_TUNNEL_PKT(p);
 
-    ret = DecodeTunnel(tv, dtv, p, GET_PKT_DATA(p),
-                       GET_PKT_LEN(p), proto);
+    ret = DecodeTunnel(tv, dtv, p, GET_PKT_DATA(p), GET_PKT_LEN(p), proto);
 
     if (unlikely(ret != TM_ECODE_OK) ||
-            (proto == DECODE_TUNNEL_IPV6_TEREDO && (p->flags & PKT_IS_INVALID)))
-    {
+        (proto == DECODE_TUNNEL_IPV6_TEREDO && (p->flags & PKT_IS_INVALID))) {
         /* Not a (valid) tunnel packet */
         SCLogDebug("tunnel packet is invalid");
 
@@ -271,7 +263,6 @@ Packet *PacketTunnelPktSetup(ThreadVars *tv, DecodeThreadVars *dtv, Packet *pare
         TmqhOutputPacketpool(tv, p);
         SCReturnPtr(NULL, "Packet");
     }
-
 
     /* tell parent packet it's part of a tunnel */
     SET_TUNNEL_PKT(parent);
@@ -300,8 +291,8 @@ Packet *PacketTunnelPktSetup(ThreadVars *tv, DecodeThreadVars *dtv, Packet *pare
  *
  *  \retval p the pseudo packet or NULL if out of memory
  */
-Packet *PacketDefragPktSetup(Packet *parent, const uint8_t *pkt, uint32_t len, uint8_t proto)
-{
+Packet *PacketDefragPktSetup(Packet *parent, const uint8_t *pkt, uint32_t len,
+                             uint8_t proto) {
     SCEnter();
 
     /* get us a packet */
@@ -339,8 +330,7 @@ Packet *PacketDefragPktSetup(Packet *parent, const uint8_t *pkt, uint32_t len, u
  *  \brief inform defrag "parent" that a pseudo packet is
  *         now associated to it.
  */
-void PacketDefragPktSetupParent(Packet *parent)
-{
+void PacketDefragPktSetupParent(Packet *parent) {
     /* tell parent packet it's part of a tunnel */
     SET_TUNNEL_PKT(parent);
 
@@ -356,10 +346,8 @@ void PacketDefragPktSetupParent(Packet *parent)
 /**
  *  \note if p->flow is set, the flow is locked
  */
-void PacketBypassCallback(Packet *p)
-{
-    if (PKT_IS_PSEUDOPKT(p))
-        return;
+void PacketBypassCallback(Packet *p) {
+    if (PKT_IS_PSEUDOPKT(p)) return;
 
 #ifdef CAPTURE_OFFLOAD
     /* Don't try to bypass if flow is already out or
@@ -367,7 +355,7 @@ void PacketBypassCallback(Packet *p)
     if (p->flow) {
         int state = p->flow->flow_state;
         if ((state == FLOW_STATE_LOCAL_BYPASSED) ||
-                (state == FLOW_STATE_CAPTURE_BYPASSED)) {
+            (state == FLOW_STATE_CAPTURE_BYPASSED)) {
             return;
         }
         FlowBypassInfo *fc = SCCalloc(sizeof(FlowBypassInfo), 1);
@@ -389,16 +377,14 @@ void PacketBypassCallback(Packet *p)
 #else /* CAPTURE_OFFLOAD */
     if (p->flow) {
         int state = p->flow->flow_state;
-        if (state == FLOW_STATE_LOCAL_BYPASSED)
-            return;
+        if (state == FLOW_STATE_LOCAL_BYPASSED) return;
         FlowUpdateState(p->flow, FLOW_STATE_LOCAL_BYPASSED);
     }
 #endif
 }
 
 /** \brief switch direction of a packet */
-void PacketSwap(Packet *p)
-{
+void PacketSwap(Packet *p) {
     if (PKT_IS_TOSERVER(p)) {
         p->flowflags &= ~FLOW_PKT_TOSERVER;
         p->flowflags |= FLOW_PKT_TOCLIENT;
@@ -422,8 +408,7 @@ void PacketSwap(Packet *p)
 static HashTable *g_counter_table = NULL;
 static SCMutex g_counter_table_mutex = SCMUTEX_INITIALIZER;
 
-void DecodeUnregisterCounters(void)
-{
+void DecodeUnregisterCounters(void) {
     SCMutexLock(&g_counter_table_mutex);
     if (g_counter_table) {
         HashTableFree(g_counter_table);
@@ -432,8 +417,7 @@ void DecodeUnregisterCounters(void)
     SCMutexUnlock(&g_counter_table_mutex);
 }
 
-void DecodeRegisterPerfCounters(DecodeThreadVars *dtv, ThreadVars *tv)
-{
+void DecodeRegisterPerfCounters(DecodeThreadVars *dtv, ThreadVars *tv) {
     /* register counters */
     dtv->counter_pkts = StatsRegisterCounter("decoder.pkts", tv);
     dtv->counter_bytes = StatsRegisterCounter("decoder.bytes", tv);
@@ -462,10 +446,14 @@ void DecodeRegisterPerfCounters(DecodeThreadVars *dtv, ThreadVars *tv)
     dtv->counter_ipv4inipv6 = StatsRegisterCounter("decoder.ipv4_in_ipv6", tv);
     dtv->counter_ipv6inipv6 = StatsRegisterCounter("decoder.ipv6_in_ipv6", tv);
     dtv->counter_mpls = StatsRegisterCounter("decoder.mpls", tv);
-    dtv->counter_avg_pkt_size = StatsRegisterAvgCounter("decoder.avg_pkt_size", tv);
-    dtv->counter_max_pkt_size = StatsRegisterMaxCounter("decoder.max_pkt_size", tv);
-    dtv->counter_max_mac_addrs_src = StatsRegisterMaxCounter("decoder.max_mac_addrs_src", tv);
-    dtv->counter_max_mac_addrs_dst = StatsRegisterMaxCounter("decoder.max_mac_addrs_dst", tv);
+    dtv->counter_avg_pkt_size =
+        StatsRegisterAvgCounter("decoder.avg_pkt_size", tv);
+    dtv->counter_max_pkt_size =
+        StatsRegisterMaxCounter("decoder.max_pkt_size", tv);
+    dtv->counter_max_mac_addrs_src =
+        StatsRegisterMaxCounter("decoder.max_mac_addrs_src", tv);
+    dtv->counter_max_mac_addrs_dst =
+        StatsRegisterMaxCounter("decoder.max_mac_addrs_dst", tv);
     dtv->counter_erspan = StatsRegisterMaxCounter("decoder.erspan", tv);
     dtv->counter_flow_memcap = StatsRegisterCounter("flow.memcap", tv);
 
@@ -475,15 +463,23 @@ void DecodeRegisterPerfCounters(DecodeThreadVars *dtv, ThreadVars *tv)
     dtv->counter_flow_icmp6 = StatsRegisterCounter("flow.icmpv6", tv);
     dtv->counter_flow_tcp_reuse = StatsRegisterCounter("flow.tcp_reuse", tv);
     dtv->counter_flow_get_used = StatsRegisterCounter("flow.get_used", tv);
-    dtv->counter_flow_get_used_eval = StatsRegisterCounter("flow.get_used_eval", tv);
-    dtv->counter_flow_get_used_eval_reject = StatsRegisterCounter("flow.get_used_eval_reject", tv);
-    dtv->counter_flow_get_used_eval_busy = StatsRegisterCounter("flow.get_used_eval_busy", tv);
-    dtv->counter_flow_get_used_failed = StatsRegisterCounter("flow.get_used_failed", tv);
+    dtv->counter_flow_get_used_eval =
+        StatsRegisterCounter("flow.get_used_eval", tv);
+    dtv->counter_flow_get_used_eval_reject =
+        StatsRegisterCounter("flow.get_used_eval_reject", tv);
+    dtv->counter_flow_get_used_eval_busy =
+        StatsRegisterCounter("flow.get_used_eval_busy", tv);
+    dtv->counter_flow_get_used_failed =
+        StatsRegisterCounter("flow.get_used_failed", tv);
 
-    dtv->counter_flow_spare_sync_avg = StatsRegisterAvgCounter("flow.wrk.spare_sync_avg", tv);
-    dtv->counter_flow_spare_sync = StatsRegisterCounter("flow.wrk.spare_sync", tv);
-    dtv->counter_flow_spare_sync_incomplete = StatsRegisterCounter("flow.wrk.spare_sync_incomplete", tv);
-    dtv->counter_flow_spare_sync_empty = StatsRegisterCounter("flow.wrk.spare_sync_empty", tv);
+    dtv->counter_flow_spare_sync_avg =
+        StatsRegisterAvgCounter("flow.wrk.spare_sync_avg", tv);
+    dtv->counter_flow_spare_sync =
+        StatsRegisterCounter("flow.wrk.spare_sync", tv);
+    dtv->counter_flow_spare_sync_incomplete =
+        StatsRegisterCounter("flow.wrk.spare_sync_incomplete", tv);
+    dtv->counter_flow_spare_sync_empty =
+        StatsRegisterCounter("flow.wrk.spare_sync_empty", tv);
 
     dtv->counter_defrag_ipv4_fragments =
         StatsRegisterCounter("defrag.ipv4.fragments", tv);
@@ -509,55 +505,55 @@ void DecodeRegisterPerfCounters(DecodeThreadVars *dtv, ThreadVars *tv)
             continue;
 
         if (i < DECODE_EVENT_PACKET_MAX &&
-                strncmp(DEvents[i].event_name, "decoder.", 8) == 0)
-        {
+            strncmp(DEvents[i].event_name, "decoder.", 8) == 0) {
             SCMutexLock(&g_counter_table_mutex);
             if (g_counter_table == NULL) {
-                g_counter_table = HashTableInit(256, StringHashFunc,
-                        StringHashCompareFunc,
-                        StringHashFreeFunc);
+                g_counter_table =
+                    HashTableInit(256, StringHashFunc, StringHashCompareFunc,
+                                  StringHashFreeFunc);
                 if (g_counter_table == NULL) {
-                    FatalError(SC_ERR_INITIALIZATION, "decoder counter hash "
-                            "table init failed");
+                    FatalError(SC_ERR_INITIALIZATION,
+                               "decoder counter hash "
+                               "table init failed");
                 }
             }
 
             char name[256];
             char *dot = strchr(DEvents[i].event_name, '.');
             BUG_ON(!dot);
-            snprintf(name, sizeof(name), "%s.%s",
-                    stats_decoder_events_prefix, dot+1);
+            snprintf(name, sizeof(name), "%s.%s", stats_decoder_events_prefix,
+                     dot + 1);
 
             const char *found = HashTableLookup(g_counter_table, name, 0);
             if (!found) {
                 char *add = SCStrdup(name);
                 if (add == NULL)
-                    FatalError(SC_ERR_INITIALIZATION, "decoder counter hash "
-                            "table name init failed");
+                    FatalError(SC_ERR_INITIALIZATION,
+                               "decoder counter hash "
+                               "table name init failed");
                 int r = HashTableAdd(g_counter_table, add, 0);
                 if (r != 0)
-                    FatalError(SC_ERR_INITIALIZATION, "decoder counter hash "
-                            "table name add failed");
+                    FatalError(SC_ERR_INITIALIZATION,
+                               "decoder counter hash "
+                               "table name add failed");
                 found = add;
             }
-            dtv->counter_engine_events[i] = StatsRegisterCounter(
-                    found, tv);
+            dtv->counter_engine_events[i] = StatsRegisterCounter(found, tv);
 
             SCMutexUnlock(&g_counter_table_mutex);
         } else {
-            dtv->counter_engine_events[i] = StatsRegisterCounter(
-                    DEvents[i].event_name, tv);
+            dtv->counter_engine_events[i] =
+                StatsRegisterCounter(DEvents[i].event_name, tv);
         }
     }
 
     return;
 }
 
-void DecodeUpdatePacketCounters(ThreadVars *tv,
-                                const DecodeThreadVars *dtv, const Packet *p)
-{
+void DecodeUpdatePacketCounters(ThreadVars *tv, const DecodeThreadVars *dtv,
+                                const Packet *p) {
     StatsIncr(tv, dtv->counter_pkts);
-    //StatsIncr(tv, dtv->counter_pkts_per_sec);
+    // StatsIncr(tv, dtv->counter_pkts_per_sec);
     StatsAddUI64(tv, dtv->counter_bytes, GET_PKT_LEN(p));
     StatsAddUI64(tv, dtv->counter_avg_pkt_size, GET_PKT_LEN(p));
     StatsSetUI64(tv, dtv->counter_max_pkt_size, GET_PKT_LEN(p));
@@ -570,14 +566,11 @@ void DecodeUpdatePacketCounters(ThreadVars *tv,
  *
  *  \todo IPv6
  */
-void AddressDebugPrint(Address *a)
-{
-    if (a == NULL)
-        return;
+void AddressDebugPrint(Address *a) {
+    if (a == NULL) return;
 
     switch (a->family) {
-        case AF_INET:
-        {
+        case AF_INET: {
             char s[16];
             PrintInet(AF_INET, (const void *)&a->addr_data32[0], s, sizeof(s));
             SCLogDebug("%s", s);
@@ -587,18 +580,18 @@ void AddressDebugPrint(Address *a)
 }
 
 /** \brief Alloc and setup DecodeThreadVars */
-DecodeThreadVars *DecodeThreadVarsAlloc(ThreadVars *tv)
-{
+DecodeThreadVars *DecodeThreadVarsAlloc(ThreadVars *tv) {
     DecodeThreadVars *dtv = NULL;
 
-    if ( (dtv = SCMalloc(sizeof(DecodeThreadVars))) == NULL)
-        return NULL;
+    if ((dtv = SCMalloc(sizeof(DecodeThreadVars))) == NULL) return NULL;
     memset(dtv, 0, sizeof(DecodeThreadVars));
 
     dtv->app_tctx = AppLayerGetCtxThread(tv);
 
-    if (OutputFlowLogThreadInit(tv, NULL, &dtv->output_flow_thread_data) != TM_ECODE_OK) {
-        SCLogError(SC_ERR_THREAD_INIT, "initializing flow log API for thread failed");
+    if (OutputFlowLogThreadInit(tv, NULL, &dtv->output_flow_thread_data) !=
+        TM_ECODE_OK) {
+        SCLogError(SC_ERR_THREAD_INIT,
+                   "initializing flow log API for thread failed");
         DecodeThreadVarsFree(tv, dtv);
         return NULL;
     }
@@ -606,11 +599,9 @@ DecodeThreadVars *DecodeThreadVarsAlloc(ThreadVars *tv)
     return dtv;
 }
 
-void DecodeThreadVarsFree(ThreadVars *tv, DecodeThreadVars *dtv)
-{
+void DecodeThreadVarsFree(ThreadVars *tv, DecodeThreadVars *dtv) {
     if (dtv != NULL) {
-        if (dtv->app_tctx != NULL)
-            AppLayerDestroyCtxThread(dtv->app_tctx);
+        if (dtv->app_tctx != NULL) AppLayerDestroyCtxThread(dtv->app_tctx);
 
         if (dtv->output_flow_thread_data != NULL)
             OutputFlowLogThreadDeinit(tv, dtv->output_flow_thread_data);
@@ -626,21 +617,19 @@ void DecodeThreadVarsFree(ThreadVars *tv, DecodeThreadVars *dtv)
  *  \param Pointer to the data
  *  \param Length of the data
  */
-inline int PacketSetData(Packet *p, const uint8_t *pktdata, uint32_t pktlen)
-{
+inline int PacketSetData(Packet *p, const uint8_t *pktdata, uint32_t pktlen) {
     SET_PKT_LEN(p, (size_t)pktlen);
     if (unlikely(!pktdata)) {
         return -1;
     }
     // ext_pkt cannot be const (because we sometimes copy)
-    p->ext_pkt = (uint8_t *) pktdata;
+    p->ext_pkt = (uint8_t *)pktdata;
     p->flags |= PKT_ZERO_COPY;
 
     return 0;
 }
 
-const char *PktSrcToString(enum PktSrcEnum pkt_src)
-{
+const char *PktSrcToString(enum PktSrcEnum pkt_src) {
     const char *pkt_src_str = "<unknown>";
     switch (pkt_src) {
         case PKT_SRC_WIRE:
@@ -683,9 +672,9 @@ const char *PktSrcToString(enum PktSrcEnum pkt_src)
     return pkt_src_str;
 }
 
-void CaptureStatsUpdate(ThreadVars *tv, CaptureStats *s, const Packet *p)
-{
-    if (unlikely(PACKET_TEST_ACTION(p, (ACTION_REJECT|ACTION_REJECT_DST|ACTION_REJECT_BOTH)))) {
+void CaptureStatsUpdate(ThreadVars *tv, CaptureStats *s, const Packet *p) {
+    if (unlikely(PACKET_TEST_ACTION(
+            p, (ACTION_REJECT | ACTION_REJECT_DST | ACTION_REJECT_BOTH)))) {
         StatsIncr(tv, s->counter_ips_rejected);
     } else if (unlikely(PACKET_TEST_ACTION(p, ACTION_DROP))) {
         StatsIncr(tv, s->counter_ips_blocked);
@@ -696,16 +685,14 @@ void CaptureStatsUpdate(ThreadVars *tv, CaptureStats *s, const Packet *p)
     }
 }
 
-void CaptureStatsSetup(ThreadVars *tv, CaptureStats *s)
-{
+void CaptureStatsSetup(ThreadVars *tv, CaptureStats *s) {
     s->counter_ips_accepted = StatsRegisterCounter("ips.accepted", tv);
     s->counter_ips_blocked = StatsRegisterCounter("ips.blocked", tv);
     s->counter_ips_rejected = StatsRegisterCounter("ips.rejected", tv);
     s->counter_ips_replaced = StatsRegisterCounter("ips.replaced", tv);
 }
 
-void DecodeGlobalConfig(void)
-{
+void DecodeGlobalConfig(void) {
     DecodeTeredoConfig();
     DecodeGeneveConfig();
     DecodeVXLANConfig();

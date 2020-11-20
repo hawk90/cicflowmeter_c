@@ -2,28 +2,26 @@
 
 #include "debug.h"
 
-MAP g_log_level_map[ ] = {
-    { "Not set",        LOG_NOTSET},
-    { "None",           LOG_NONE },
-    { "Emergency",      LOG_EMERGENCY },
-    { "Alert",          LOG_ALERT },
-    { "Critical",       LOG_CRITICAL },
-    { "Error",          LOG_ERROR },
-    { "Warning",        LOG_WARNING },
-    { "Notice",         LOG_NOTICE },
-    { "Info",           LOG_INFO },
-    { "Perf",           LOG_PERF },
-    { "Config",         LOG_CONFIG },
-    { "Debug",          LOG_DEBUG },
-    { NULL,             -1 }
-};
+MAP g_log_level_map[] = {{"Not set", LOG_NOTSET},
+                         {"None", LOG_NONE},
+                         {"Emergency", LOG_EMERGENCY},
+                         {"Alert", LOG_ALERT},
+                         {"Critical", LOG_CRITICAL},
+                         {"Error", LOG_ERROR},
+                         {"Warning", LOG_WARNING},
+                         {"Notice", LOG_NOTICE},
+                         {"Info", LOG_INFO},
+                         {"Perf", LOG_PERF},
+                         {"Config", LOG_CONFIG},
+                         {"Debug", LOG_DEBUG},
+                         {NULL, -1}};
 
 struct LOG_CONFIG {
-	LOG_TYPE_T log_type;
-	FILE *fd;
-	pthread_mutex_t mutex;
-	uint32_t color;
-}LOG_CONFIG_T ;
+    LOG_TYPE_T log_type;
+    FILE *fd;
+    pthread_mutex_t mutex;
+    uint32_t color;
+} LOG_CONFIG_T;
 
 static struct LOG_CONFIG_T g_log_config;
 
@@ -39,9 +37,10 @@ static struct LOG_CONFIG_T g_log_config;
  * \retval OK on success; else an error code
  */
 static ERROR_CODE get_fmt_log_message_buffer(
-		struct timeval *tval, char *buffer, size_t buffer_size, const char *log_format,
-		const LOG_LEVEL_T log_level, const char *file, const char *function, const uint32_t line,	const ERROR_CODE error_code, const char *message)
-{
+    struct timeval *tval, char *buffer, size_t buffer_size,
+    const char *log_format, const LOG_LEVEL_T log_level, const char *file,
+    const char *function, const uint32_t line, const ERROR_CODE error_code,
+    const char *message) {
     char *temp = buffer;
     const char *s = NULL;
     struct tm *tms = NULL;
@@ -55,35 +54,35 @@ static ERROR_CODE get_fmt_log_message_buffer(
     char *temp_fmt = local_format;
     char *substr = temp_fmt;
 
-	const char *redb = "\x1b[1;31m";
-	const char *red = "\x1b[31m";
-	const char *yellowb = "\x1b[1;33m";
-	const char *yellow = "\x1b[33m";
-	const char *green = "\x1b[32m";
-	const char *blue = "\x1b[34m";
-	const char *reset = "\x1b[0m";
+    const char *redb = "\x1b[1;31m";
+    const char *red = "\x1b[31m";
+    const char *yellowb = "\x1b[1;33m";
+    const char *yellow = "\x1b[33m";
+    const char *green = "\x1b[32m";
+    const char *blue = "\x1b[34m";
+    const char *reset = "\x1b[0m";
 
-	// REL "%d - <%d>"
-	// DEV "%t - (%f:%l) <%d> (%n) -- " 
-	// t: timestamp
-	// f: filename
-	// l: line number
-	// d: log level
-	// n: funtion
-	while ( (temp_fmt = strchr(temp_fmt, LOG_FMT_PREFIX)) ) {
+    // REL "%d - <%d>"
+    // DEV "%t - (%f:%l) <%d> (%n) -- "
+    // t: timestamp
+    // f: filename
+    // l: line number
+    // d: log level
+    // n: funtion
+    while ((temp_fmt = strchr(temp_fmt, LOG_FMT_PREFIX))) {
         if ((temp - buffer) > MAX_LOG_MSG_LEN) goto ok;
 
-        switch(temp_fmt[1]) {
+        switch (temp_fmt[1]) {
             case LOG_FMT_TIME:
                 temp_fmt[0] = '\0';
 
                 struct tm local_tm;
-				tms = localtime_r(&tval->tv_sec, &local_tm);
-				if (tms == NULL) goto error; 
+                tms = localtime_r(&tval->tv_sec, &local_tm);
+                if (tms == NULL) goto error;
 
                 rt = snprintf(temp, MAX_LOG_MSG_LEN - (temp - buffer),
-                              "%s%s%d/%d/%04d -- %02d:%02d:%02d%s",
-                              substr, green, tms->tm_mday, tms->tm_mon + 1,
+                              "%s%s%d/%d/%04d -- %02d:%02d:%02d%s", substr,
+                              green, tms->tm_mday, tms->tm_mon + 1,
                               tms->tm_year + 1900, tms->tm_hour, tms->tm_min,
                               tms->tm_sec, reset);
                 if (rt < 0) goto error;
@@ -97,7 +96,7 @@ static ERROR_CODE get_fmt_log_message_buffer(
 #if 0
                 temp_fmt[0] = '\0';
                 rt = snprintf(temp, LOG_MAX_LOG_MSG_LEN - (temp - buffer),
-                              "%s%s%u%s", substr, yellow, getpid(), reset);
+                        "%s%s%u%s", substr, yellow, getpid(), reset);
                 if (rt < 0)
                     return ERROR_SPRINTF;
                 temp += rt;
@@ -111,7 +110,7 @@ static ERROR_CODE get_fmt_log_message_buffer(
 #if 0
                 temp_fmt[0] = '\0';
                 rt = snprintf(temp, LOG_MAX_LOG_MSG_LEN - (temp - buffer),
-                              "%s%s%lu%s", substr, yellow, SCGetThreadIdLong(), reset);
+                        "%s%s%lu%s", substr, yellow, SCGetThreadIdLong(), reset);
                 if (rt < 0)
                     return ERROR_SPRINTF;
                 temp += rt;
@@ -125,7 +124,7 @@ static ERROR_CODE get_fmt_log_message_buffer(
 #if 0
                 temp_fmt[0] = '\0';
                 rt = snprintf(temp, LOG_MAX_LOG_MSG_LEN - (temp - buffer),
-                              "%s%s", substr, "N/A");
+                        "%s%s", substr, "N/A");
                 if (rt < 0)
                     return ERROR_SPRINTF;
                 temp += rt;
@@ -141,16 +140,16 @@ static ERROR_CODE get_fmt_log_message_buffer(
                 if (s != NULL) {
                     if (log_level <= LOG_ERROR)
                         rt = snprintf(temp, MAX_LOG_MSG_LEN - (temp - buffer),
-                                  "%s%s%s%s", substr, redb, s, reset);
+                                      "%s%s%s%s", substr, redb, s, reset);
                     else if (log_level == LOG_WARNING)
                         rt = snprintf(temp, MAX_LOG_MSG_LEN - (temp - buffer),
-                                  "%s%s%s%s", substr, red, s, reset);
+                                      "%s%s%s%s", substr, red, s, reset);
                     else if (log_level == LOG_NOTICE)
                         rt = snprintf(temp, MAX_LOG_MSG_LEN - (temp - buffer),
-                                  "%s%s%s%s", substr, yellowb, s, reset);
+                                      "%s%s%s%s", substr, yellowb, s, reset);
                     else
                         rt = snprintf(temp, MAX_LOG_MSG_LEN - (temp - buffer),
-                                  "%s%s%s%s", substr, yellow, s, reset);
+                                      "%s%s%s%s", substr, yellow, s, reset);
                 } else {
                     rt = snprintf(temp, MAX_LOG_MSG_LEN - (temp - buffer),
                                   "%s%s", substr, "INVALID");
@@ -198,14 +197,14 @@ static ERROR_CODE get_fmt_log_message_buffer(
                 substr = temp_fmt;
                 substr++;
                 break;
-
         }
         temp_fmt++;
-	}
+    }
     if ((temp - buffer) > MAX_LOG_MSG_LEN) goto ok;
 
     rt = snprintf(temp, MAX_LOG_MSG_LEN - (temp - buffer), "%s", substr);
-    if (rt < 0) goto error;;
+    if (rt < 0) goto error;
+    ;
 
     temp += rt;
     if ((temp - buffer) > MAX_LOG_MSG_LEN) {
@@ -214,7 +213,9 @@ static ERROR_CODE get_fmt_log_message_buffer(
 
     if (error_code != OK) {
         rt = snprintf(temp, MAX_LOG_MSG_LEN - (temp - buffer),
-                "[%sERRCODE%s: %s%s%s(%s%d%s)] - ", yellow, reset, red, error_to_string(error_code), reset, yellow, error_code, reset);
+                      "[%sERRCODE%s: %s%s%s(%s%d%s)] - ", yellow, reset, red,
+                      error_to_string(error_code), reset, yellow, error_code,
+                      reset);
         if (rt < 0) {
             return ERROR_SPRINTF;
         }
@@ -229,97 +230,96 @@ static ERROR_CODE get_fmt_log_message_buffer(
         hi = red;
     else if (log_level >= LOG_NOTICE)
         hi = yellow;
-    rt = snprintf(temp, MAX_LOG_MSG_LEN - (temp - buffer), "%s%s%s", hi, message, reset);
+    rt = snprintf(temp, MAX_LOG_MSG_LEN - (temp - buffer), "%s%s%s", hi,
+                  message, reset);
     if (rt < 0) return ERROR_SPRINTF;
     temp += rt;
     if ((temp - buffer) > MAX_LOG_MSG_LEN) {
         return OK;
     }
 
-	return OK;
+    return OK;
 
 ok:
-	return OK;
+    return OK;
 error:
-	return ERROR_SPRINTF;
+    return ERROR_SPRINTF;
 }
 
-static inline int flush_log_buffer(FILE *fd, const char *msg)
-{
-	int rt = 0;
+static inline int flush_log_buffer(FILE *fd, const char *msg) {
+    int rt = 0;
 
-	if (fd == NULL) goto error;
-	
-	rt = fprintf(fd, "%s\n", msg);
-	if (rt < 0)	goto error;
+    if (fd == NULL) goto error;
 
-	rt = fflush(fd);
-	if (rt < 0) goto error;
+    rt = fprintf(fd, "%s\n", msg);
+    if (rt < 0) goto error;
 
-	return 0;
+    rt = fflush(fd);
+    if (rt < 0) goto error;
+
+    return 0;
 
 error:
-	return -1;
+    return -1;
 }
 
-ERROR_CODE print_log(const LOG_LEVEL_T log_level, const char *file, const char *func, const uint32_t line, ERROR_CODE error_code, const char *message)
-{	
-	char buffer[MAX_LOG_MSG_LEN] = "";
-	struct timeval tval;
-	int rt = 0;
-	
+ERROR_CODE print_log(const LOG_LEVEL_T log_level, const char *file,
+                     const char *func, const uint32_t line,
+                     ERROR_CODE error_code, const char *message) {
+    char buffer[MAX_LOG_MSG_LEN] = "";
+    struct timeval tval;
+    int rt = 0;
 
-	rt = gettimeofday(&tval, NULL);
-	if (rt != 0) goto error;
+    rt = gettimeofday(&tval, NULL);
+    if (rt != 0) goto error;
 
-	/* conf */
-	rt = get_fmt_log_message_buffer(&tval, buffer, sizeof(buffer), DEF_LOG_FORMAT_DEV, log_level, file, func, line, error_code, message);
-	if (rt != 0) goto error;
+    /* conf */
+    rt = get_fmt_log_message_buffer(&tval, buffer, sizeof(buffer),
+                                    DEF_LOG_FORMAT_DEV, log_level, file, func,
+                                    line, error_code, message);
+    if (rt != 0) goto error;
 
-	switch (g_log_config.log_type) {
-		case LOG_TYPE_T_STREAM:
-			flush_log_buffer(stdout, buffer);
-			break;
-		case LOG_TYPE_T_FILE:
-			pthread_mutex_lock(&(g_log_config.mutex));
+    switch (g_log_config.log_type) {
+        case LOG_TYPE_T_STREAM:
+            flush_log_buffer(stdout, buffer);
+            break;
+        case LOG_TYPE_T_FILE:
+            pthread_mutex_lock(&(g_log_config.mutex));
 
-			/* Ciritical Session */
-			g_log_config.fd = fopen("cicflowmeter", "a");
-			flush_log_buffer(g_log_config.fd, buffer);
-			fclose(g_log_config.fd);
+            /* Ciritical Session */
+            g_log_config.fd = fopen("cicflowmeter", "a");
+            flush_log_buffer(g_log_config.fd, buffer);
+            fclose(g_log_config.fd);
 
-			pthread_mutex_unlock(&(g_log_config.mutex));
-			break;
-		case LOG_TYPE_T_STREAM_AND_FILE:
-			break;
-		default:
-			goto error;
-	}
+            pthread_mutex_unlock(&(g_log_config.mutex));
+            break;
+        case LOG_TYPE_T_STREAM_AND_FILE:
+            break;
+        default:
+            goto error;
+    }
 error:
-	return OK;
+    return OK;
 }
 
 void logger(const LOG_LEVEL_T log_level, const char *file, const char *func,
-			const uint32_t line, ERROR_CODE error_code, const char *fmt, ...)
-{
-	if (log_level >= LOG_DEBUG) {
-		char msg[MAX_LOG_MSG_LEN];
-		va_list ap;
+            const uint32_t line, ERROR_CODE error_code, const char *fmt, ...) {
+    if (log_level >= LOG_DEBUG) {
+        char msg[MAX_LOG_MSG_LEN];
+        va_list ap;
 
-		va_start(ap, fmt);
-		vsnprintf(msg, sizeof(msg), fmt, ap);
-		va_end(ap);
+        va_start(ap, fmt);
+        vsnprintf(msg, sizeof(msg), fmt, ap);
+        va_end(ap);
 
-		print_log(log_level, file, func, line, error_code, msg);
-	}
-
+        print_log(log_level, file, func, line, error_code, msg);
+    }
 }
 
-int init_log_config()
-{
-	g_log_config.log_type = LOG_TYPE_T_STREAM;
-	g_log_config.fd = NULL;
-	pthread_mutex_init(&(g_log_config.mutex), NULL);
+int init_log_config() {
+    g_log_config.log_type = LOG_TYPE_T_STREAM;
+    g_log_config.fd = NULL;
+    pthread_mutex_init(&(g_log_config.mutex), NULL);
 
-	return 0;
+    return 0;
 }

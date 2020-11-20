@@ -1,10 +1,9 @@
 #include "cicflowmeter-c/common/cicflowmeter-common.h"
 
-#include "enum.h"
 #include "debug.h"
+#include "enum.h"
 
-int get_map_value(const char *key, MAP_T *map)
-{
+int get_map_value(const char *key, MAP_T *map) {
     int result = -1;
 
     if (key == NULL || map == NULL) goto error;
@@ -19,13 +18,11 @@ int get_map_value(const char *key, MAP_T *map)
     return result;
 
 error:
-	LOG_DBG_MSG("Invalid argument(s) passed into get_map_value");
-	return -1;
+    LOG_DBG_MSG("Invalid argument(s) passed into get_map_value");
+    return -1;
 }
 
-
-const char *get_map_key(int value, MAP_T *map)
-{
+const char *get_map_key(int value, MAP_T *map) {
     if (map == NULL) goto error;
 
     for (; map->key != NULL; map++) {
@@ -34,11 +31,10 @@ const char *get_map_key(int value, MAP_T *map)
         }
     }
 
-	LOG_DBG_MSG("A enum by the value %d doesn't exist in this map", value);
+    LOG_DBG_MSG("A enum by the value %d doesn't exist in this map", value);
     return NULL;
 
 error:
-	LOG_DBG_MSG("Invalid argument(s) passed into get_map_key");
-	return NULL;
-
+    LOG_DBG_MSG("Invalid argument(s) passed into get_map_key");
+    return NULL;
 }

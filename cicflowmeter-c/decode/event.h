@@ -4,9 +4,10 @@
 /* packet decoder events */
 enum {
     /* IPV4 EVENTS */
-    IPV4_PKT_TOO_SMALL = 0,       /**< ipv4 pkt smaller than minimum header size */
-    IPV4_HLEN_TOO_SMALL,          /**< ipv4 header smaller than minimum size */
-    IPV4_IPLEN_SMALLER_THAN_HLEN, /**< ipv4 pkt len smaller than ip header size */
+    IPV4_PKT_TOO_SMALL = 0, /**< ipv4 pkt smaller than minimum header size */
+    IPV4_HLEN_TOO_SMALL,    /**< ipv4 header smaller than minimum size */
+    IPV4_IPLEN_SMALLER_THAN_HLEN, /**< ipv4 pkt len smaller than ip header size
+                                   */
     IPV4_TRUNC_PKT,               /**< truncated ipv4 packet */
 
     /* IPV4 OPTIONS */
@@ -33,25 +34,34 @@ enum {
     ICMPV6_PKT_TOO_SMALL,               /**< icmpv6 smaller than minimum size */
     ICMPV6_IPV6_UNKNOWN_VER,            /**< unknown version in icmpv6 packet */
     ICMPV6_IPV6_TRUNC_PKT,              /**< truncated icmpv6 packet */
-    ICMPV6_MLD_MESSAGE_WITH_INVALID_HL, /**< invalid MLD that doesn't have HL 1 */
+    ICMPV6_MLD_MESSAGE_WITH_INVALID_HL, /**< invalid MLD that doesn't have HL 1
+                                         */
     ICMPV6_UNASSIGNED_TYPE,             /**< unsassigned ICMPv6 type */
-    ICMPV6_EXPERIMENTATION_TYPE,        /**< uprivate experimentation ICMPv6 type */
+    ICMPV6_EXPERIMENTATION_TYPE, /**< uprivate experimentation ICMPv6 type */
 
     /* IPV6 EVENTS */
     IPV6_PKT_TOO_SMALL,     /**< ipv6 packet smaller than minimum size */
     IPV6_TRUNC_PKT,         /**< truncated ipv6 packet */
     IPV6_TRUNC_EXTHDR,      /**< truncated ipv6 extension header */
-    IPV6_EXTHDR_DUPL_FH,    /**< duplicated "fragment" header in ipv6 extension headers */
+    IPV6_EXTHDR_DUPL_FH,    /**< duplicated "fragment" header in ipv6 extension
+                               headers */
     IPV6_EXTHDR_USELESS_FH, /**< useless FH: offset 0 + no more fragments */
-    IPV6_EXTHDR_DUPL_RH,    /**< duplicated "routing" header in ipv6 extension headers */
-    IPV6_EXTHDR_DUPL_HH,    /**< duplicated "hop-by-hop" header in ipv6 extension headers */
-    IPV6_EXTHDR_DUPL_DH,    /**< duplicated "destination" header in ipv6 extension headers */
-    IPV6_EXTHDR_DUPL_AH,    /**< duplicated "authentication" header in ipv6 extension headers */
-    IPV6_EXTHDR_DUPL_EH,    /**< duplicated "ESP" header in ipv6 extension headers */
+    IPV6_EXTHDR_DUPL_RH,    /**< duplicated "routing" header in ipv6 extension
+                               headers */
+    IPV6_EXTHDR_DUPL_HH, /**< duplicated "hop-by-hop" header in ipv6 extension
+                            headers */
+    IPV6_EXTHDR_DUPL_DH, /**< duplicated "destination" header in ipv6 extension
+                            headers */
+    IPV6_EXTHDR_DUPL_AH, /**< duplicated "authentication" header in ipv6
+                            extension headers */
+    IPV6_EXTHDR_DUPL_EH, /**< duplicated "ESP" header in ipv6 extension headers
+                          */
 
-    IPV6_EXTHDR_INVALID_OPTLEN,  /**< the opt len in an hop or dst hdr is invalid. */
+    IPV6_EXTHDR_INVALID_OPTLEN,  /**< the opt len in an hop or dst hdr is
+                                    invalid. */
     IPV6_WRONG_IP_VER,           /**< wrong version in ipv6 */
-    IPV6_EXTHDR_AH_RES_NOT_NULL, /**< AH hdr reserved fields not null (rfc 4302) */
+    IPV6_EXTHDR_AH_RES_NOT_NULL, /**< AH hdr reserved fields not null (rfc 4302)
+                                  */
 
     IPV6_HOPOPTS_UNKNOWN_OPT,  /**< unknown HOP opt */
     IPV6_HOPOPTS_ONLY_PADDING, /**< all options in HOP opts are padding */
@@ -88,7 +98,8 @@ enum {
 
     /* PPP EVENTS */
     PPP_PKT_TOO_SMALL,     /**< ppp packet smaller than minimum size */
-    PPPVJU_PKT_TOO_SMALL,  /**< ppp vj uncompressed packet smaller than minimum size */
+    PPPVJU_PKT_TOO_SMALL,  /**< ppp vj uncompressed packet smaller than minimum
+                              size */
     PPPIPV4_PKT_TOO_SMALL, /**< ppp ipv4 packet smaller than minimum size */
     PPPIPV6_PKT_TOO_SMALL, /**< ppp ipv6 packet smaller than minimum size */
     PPP_WRONG_TYPE,        /**< wrong type in ppp frame */
@@ -100,12 +111,13 @@ enum {
     PPPOE_MALFORMED_TAGS, /**< malformed tags in pppoe */
 
     /* GRE EVENTS */
-    GRE_PKT_TOO_SMALL,              /**< gre packet smaller than minimum size */
-    GRE_WRONG_VERSION,              /**< wrong version in gre header */
-    GRE_VERSION0_RECUR,             /**< gre v0 recursion control */
-    GRE_VERSION0_FLAGS,             /**< gre v0 flags */
-    GRE_VERSION0_HDR_TOO_BIG,       /**< gre v0 header bigger than maximum size */
-    GRE_VERSION0_MALFORMED_SRE_HDR, /**< gre v0 malformed source route entry header */
+    GRE_PKT_TOO_SMALL,        /**< gre packet smaller than minimum size */
+    GRE_WRONG_VERSION,        /**< wrong version in gre header */
+    GRE_VERSION0_RECUR,       /**< gre v0 recursion control */
+    GRE_VERSION0_FLAGS,       /**< gre v0 flags */
+    GRE_VERSION0_HDR_TOO_BIG, /**< gre v0 header bigger than maximum size */
+    GRE_VERSION0_MALFORMED_SRE_HDR, /**< gre v0 malformed source route entry
+                                       header */
     GRE_VERSION1_CHKSUM,            /**< gre v1 checksum */
     GRE_VERSION1_ROUTE,             /**< gre v1 routing */
     GRE_VERSION1_SSR,               /**< gre v1 strict source route */
@@ -113,7 +125,8 @@ enum {
     GRE_VERSION1_FLAGS,             /**< gre v1 flags */
     GRE_VERSION1_NO_KEY,            /**< gre v1 no key present in header */
     GRE_VERSION1_WRONG_PROTOCOL,    /**< gre v1 wrong protocol */
-    GRE_VERSION1_MALFORMED_SRE_HDR, /**< gre v1 malformed source route entry header */
+    GRE_VERSION1_MALFORMED_SRE_HDR, /**< gre v1 malformed source route entry
+                                       header */
     GRE_VERSION1_HDR_TOO_BIG,       /**< gre v1 header too big */
 
     /* VLAN EVENTS */
@@ -128,7 +141,8 @@ enum {
 
     /* LINKTYPE NULL EVENTS */
     LTNULL_PKT_TOO_SMALL,    /**< pkt too small for lt:null */
-    LTNULL_UNSUPPORTED_TYPE, /**< pkt has a type that the decoder doesn't support */
+    LTNULL_UNSUPPORTED_TYPE, /**< pkt has a type that the decoder doesn't
+                                support */
 
     /* SCTP EVENTS */
     SCTP_PKT_TOO_SMALL, /**< sctp packet smaller than minimum size */
@@ -247,8 +261,7 @@ enum {
     DECODE_EVENT_MAX,
 };
 
-#define EVENT_IS_DECODER_PACKET_ERROR(e)    \
-    ((e) < (DECODE_EVENT_PACKET_MAX))
+#define EVENT_IS_DECODER_PACKET_ERROR(e) ((e) < (DECODE_EVENT_PACKET_MAX))
 
 /* supported decoder events */
 
