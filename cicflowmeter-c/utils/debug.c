@@ -2,28 +2,28 @@
 
 #include "debug.h"
 
-MAP g_log_level_map[] = {{"Not set", LOG_NOTSET},
-                         {"None", LOG_NONE},
-                         {"Emergency", LOG_EMERGENCY},
-                         {"Alert", LOG_ALERT},
-                         {"Critical", LOG_CRITICAL},
-                         {"Error", LOG_ERROR},
-                         {"Warning", LOG_WARNING},
-                         {"Notice", LOG_NOTICE},
-                         {"Info", LOG_INFO},
-                         {"Perf", LOG_PERF},
-                         {"Config", LOG_CONFIG},
-                         {"Debug", LOG_DEBUG},
-                         {NULL, -1}};
+MAP_T g_log_level_map[] = {{"Not set", LOG_NOTSET},
+                           {"None", LOG_NONE},
+                           {"Emergency", LOG_EMERGENCY},
+                           {"Alert", LOG_ALERT},
+                           {"Critical", LOG_CRITICAL},
+                           {"Error", LOG_ERROR},
+                           {"Warning", LOG_WARNING},
+                           {"Notice", LOG_NOTICE},
+                           {"Info", LOG_INFO},
+                           {"Perf", LOG_PERF},
+                           {"Config", LOG_CONFIG},
+                           {"Debug", LOG_DEBUG},
+                           {NULL, -1}};
 
-struct LOG_CONFIG {
+struct _LOG_CONFIG_T {
     LOG_TYPE_T log_type;
     FILE *fd;
     pthread_mutex_t mutex;
     uint32_t color;
 } LOG_CONFIG_T;
 
-static struct LOG_CONFIG_T g_log_config;
+static struct _LOG_CONFIG_T g_log_config;
 
 /**
  * \brief Adds the global log_format to the outgoing buffer
@@ -36,10 +36,10 @@ static struct LOG_CONFIG_T g_log_config;
  *
  * \retval OK on success; else an error code
  */
-static ERROR_CODE get_fmt_log_message_buffer(
+static ERROR_CODE_T get_fmt_log_message_buffer(
     struct timeval *tval, char *buffer, size_t buffer_size,
     const char *log_format, const LOG_LEVEL_T log_level, const char *file,
-    const char *function, const uint32_t line, const ERROR_CODE error_code,
+    const char *function, const uint32_t line, const ERROR_CODE_T error_code,
     const char *message) {
     char *temp = buffer;
     const char *s = NULL;
@@ -134,7 +134,7 @@ static ERROR_CODE get_fmt_log_message_buffer(
 #endif
                 break;
 
-            case LOG_FMT_LOG_LEVEL_T:
+            case LOG_FMT_LOG_LEVEL:
                 temp_fmt[0] = '\0';
                 s = get_map_key(log_level, g_log_level_map);
                 if (s != NULL) {
@@ -263,9 +263,9 @@ error:
     return -1;
 }
 
-ERROR_CODE print_log(const LOG_LEVEL_T log_level, const char *file,
-                     const char *func, const uint32_t line,
-                     ERROR_CODE error_code, const char *message) {
+ERROR_CODE_T print_log(const LOG_LEVEL_T log_level, const char *file,
+                       const char *func, const uint32_t line,
+                       ERROR_CODE_T error_code, const char *message) {
     char buffer[MAX_LOG_MSG_LEN] = "";
     struct timeval tval;
     int rt = 0;
@@ -280,10 +280,10 @@ ERROR_CODE print_log(const LOG_LEVEL_T log_level, const char *file,
     if (rt != 0) goto error;
 
     switch (g_log_config.log_type) {
-        case LOG_TYPE_T_STREAM:
+        case LOG_TYPE_STREAM:
             flush_log_buffer(stdout, buffer);
             break;
-        case LOG_TYPE_T_FILE:
+        case LOG_TYPE_FILE:
             pthread_mutex_lock(&(g_log_config.mutex));
 
             /* Ciritical Session */
@@ -293,7 +293,7 @@ ERROR_CODE print_log(const LOG_LEVEL_T log_level, const char *file,
 
             pthread_mutex_unlock(&(g_log_config.mutex));
             break;
-        case LOG_TYPE_T_STREAM_AND_FILE:
+        case LOG_TYPE_STREAM_AND_FILE:
             break;
         default:
             goto error;
@@ -303,7 +303,8 @@ error:
 }
 
 void logger(const LOG_LEVEL_T log_level, const char *file, const char *func,
-            const uint32_t line, ERROR_CODE error_code, const char *fmt, ...) {
+            const uint32_t line, ERROR_CODE_T error_code, const char *fmt,
+            ...) {
     if (log_level >= LOG_DEBUG) {
         char msg[MAX_LOG_MSG_LEN];
         va_list ap;
@@ -317,7 +318,7 @@ void logger(const LOG_LEVEL_T log_level, const char *file, const char *func,
 }
 
 int init_log_config() {
-    g_log_config.log_type = LOG_TYPE_T_STREAM;
+    g_log_config.log_type = LOG_TYPE_STREAM;
     g_log_config.fd = NULL;
     pthread_mutex_init(&(g_log_config.mutex), NULL);
 

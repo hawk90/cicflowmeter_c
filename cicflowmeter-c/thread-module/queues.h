@@ -5,9 +5,9 @@
 extern "C" {
 #endif
 
-#include "packet-queue.h"
+#include "../packet/queue.h"
 
-typedef struct Tmq_ {
+typedef struct _TM_QUEUE_T {
     char *name;
     bool is_packet_pool;
     uint16_t id;
@@ -17,8 +17,8 @@ typedef struct Tmq_ {
     TAILQ_ENTRY(Tmq_) next;
 } TM_QUEUE_T;
 
-Tmq *TmqCreateQueue(const char *name);
-Tmq *TmqGetQueueByName(const char *name);
+TM_QUEUE_T *create_tm_queue(const char *name);
+TM_QUEUE_T *get_tm_queue_by_name(const char *name);
 
 void TmqDebugList(void);
 void TmqResetQueues(void);

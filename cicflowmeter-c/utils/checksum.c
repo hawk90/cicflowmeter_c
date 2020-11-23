@@ -15,22 +15,16 @@
  * 02110-1301, USA.
  */
 
-/**
- * \file
- *
- * \author Eric Leblond <eric@regit.org>
- *
- * Util functions for checskum.
- */
+#include "../common/cicflowmeter_common.h"
 
-#include "suricata-common.h"
+#include "checksum.h"
+#include "debug.h"
 
-#include "util-checksum.h"
-
-int ReCalculateChecksum(Packet *p) {
+/*
+int recalculate_checksum(Packet *p) {
     if (PKT_IS_IPV4(p)) {
         if (PKT_IS_TCP(p)) {
-            /* TCP */
+            // TCP
             p->tcph->th_sum = 0;
             p->tcph->th_sum =
                 TCPChecksum(p->ip4h->s_ip_addrs, (uint16_t *)p->tcph,
@@ -41,12 +35,12 @@ int ReCalculateChecksum(Packet *p) {
                 UDPV4Checksum(p->ip4h->s_ip_addrs, (uint16_t *)p->udph,
                               (p->payload_len + UDP_HEADER_LEN), 0);
         }
-        /* IPV4 */
+        // IPV4
         p->ip4h->ip_csum = 0;
         p->ip4h->ip_csum =
             IPV4Checksum((uint16_t *)p->ip4h, IPV4_GET_RAW_HLEN(p->ip4h), 0);
     } else if (PKT_IS_IPV6(p)) {
-        /* just TCP for IPV6 */
+        // just TCP for IPV6
         if (PKT_IS_TCP(p)) {
             p->tcph->th_sum = 0;
             p->tcph->th_sum =
@@ -62,7 +56,7 @@ int ReCalculateChecksum(Packet *p) {
 
     return 0;
 }
-
+*/
 /**
  *  \brief Check if the number of invalid checksums indicate checksum
  *         offloading in place.
@@ -70,26 +64,26 @@ int ReCalculateChecksum(Packet *p) {
  *  \retval 1 yes, offloading in place
  *  \retval 0 no, no offloading used
  */
-int ChecksumAutoModeCheck(uint64_t thread_count, uint64_t iface_count,
-                          uint64_t iface_fail) {
+int check_checksum_automode(uint64_t thread_count, uint64_t iface_count,
+                            uint64_t iface_fail) {
     if (thread_count == CHECKSUM_SAMPLE_COUNT) {
         if (iface_fail != 0) {
             if ((iface_count / iface_fail) < CHECKSUM_INVALID_RATIO) {
-                SCLogInfo(
+                LOG_INFO_MSG(
                     "More than 1/%dth of packets have an invalid "
                     "checksum, assuming checksum offloading is used "
                     "(%" PRIu64 "/%" PRIu64 ")",
                     CHECKSUM_INVALID_RATIO, iface_fail, iface_count);
                 return 1;
             } else {
-                SCLogInfo(
+                LOG_INFO_MSG(
                     "Less than 1/%dth of packets have an invalid "
                     "checksum, assuming checksum offloading is NOT used "
                     "(%" PRIu64 "/%" PRIu64 ")",
                     CHECKSUM_INVALID_RATIO, iface_fail, iface_count);
             }
         } else {
-            SCLogInfo(
+            LOG_INFO_MSG(
                 "No packets with invalid checksum, assuming "
                 "checksum offloading is NOT used");
         }

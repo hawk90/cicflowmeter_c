@@ -17,4 +17,12 @@ cc_binary(
 		"//cicflowmeter-c/common:common-dep",
 		":cicflowmeter-dep",
     ]
+    '''
+	deps = [
+		"//cicflowmeter-c/utils:utils-dep",
+		"//cicflowmeter-c/common:common-dep",
+		"//cicflowmeter-c/decode:decode-dep",
+		":cicflowmeter-dep",
+	],
+    '''
 )

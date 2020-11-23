@@ -70,7 +70,7 @@ typedef enum {
 #define LOG_FMT_FUNCTION 'n'  /* Function */
 
 void logger(const LOG_LEVEL_T log_level, const char *file, const char *func,
-            const uint32_t line, const ERROR_CODE error_code, const char *fmt,
+            const uint32_t line, const ERROR_CODE_T error_code, const char *fmt,
             ...) CHECK_PRINTF(6, 7);
 
 #define LOG_TRACE_MSG(...) \
@@ -89,7 +89,7 @@ void logger(const LOG_LEVEL_T log_level, const char *file, const char *func,
     logger(LOG_CRITICAL, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
 #define LOG_ALERT_MSG(error_code, ...) \
     logger(LOG_ALERT, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
-#define LOG_MERG_MSG(error_code, ...) \
+#define LOG_EMERG_MSG(error_code, ...) \
     logger(LOG_EMERGENCY, __FILE__, __func__, __LINE__, error_code, __VA_ARGS__)
 
 extern LOG_LEVEL_T g_log_level;

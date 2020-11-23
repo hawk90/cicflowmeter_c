@@ -1,14 +1,14 @@
+#include "../thread/threads.h"
 #include "cicflowmeter_common.h"
 #include "packet/queue.h"
 #include "threads.h"
-#include "tm/threads.h"
 #include "util/debug.h"
 #include "util/logopenfile.h"
 
-TmModule tmm_modules[TMM_SIZE];
+TM_MODULES_T tmm_modules[TMM_SIZE];
 
 void TmModuleDebugList(void) {
-    TmModule *t;
+    TM_MODULES_T *t;
     uint16_t i;
 
     for (i = 0; i < TMM_SIZE; i++) {
@@ -23,8 +23,8 @@ void TmModuleDebugList(void) {
 /** \brief get a tm module ptr by name
  *  \param name name string
  *  \retval ptr to the module or NULL */
-TmModule *TmModuleGetByName(const char *name) {
-    TmModule *t;
+TM_MODULES_T *TmModuleGetByName(const char *name) {
+    TM_MODULES_T *t;
     uint16_t i;
 
     for (i = 0; i < TMM_SIZE; i++) {
@@ -42,7 +42,7 @@ TmModule *TmModuleGetByName(const char *name) {
  *  \param name registered name of the module
  *  \retval id the id or -1 in case of error */
 int TmModuleGetIdByName(const char *name) {
-    TmModule *tm = TmModuleGetByName(name);
+    TM_MODULES_T *tm = TmModuleGetByName(name);
     if (tm == NULL) return -1;
     ;
     return TmModuleGetIDForTM(tm);
@@ -56,7 +56,7 @@ int TmModuleGetIdByName(const char *name) {
  * \retval Pointer of the module to be returned if available;
  *         NULL if unavailable.
  */
-TmModule *TmModuleGetById(int id) {
+TM_MODULES_T *TmModuleGetById(int id) {
     if (id < 0 || id >= TMM_SIZE) {
         SCLogError(SC_ERR_TM_MODULES_ERROR,
                    "Threading module with the id "
@@ -75,7 +75,7 @@ TmModule *TmModuleGetById(int id) {
  *
  * \retval id of the TM Module if available; -1 if unavailable.
  */
-int TmModuleGetIDForTM(TmModule *tm) {
+int TmModuleGetIDForTM(TM_MODULES_T *tm) {
     TmModule *t;
     int i;
 
@@ -91,7 +91,7 @@ int TmModuleGetIDForTM(TmModule *tm) {
 }
 
 void TmModuleRunInit(void) {
-    TmModule *t;
+    TM_MODULES_T *t;
     uint16_t i;
 
     for (i = 0; i < TMM_SIZE; i++) {
@@ -106,7 +106,7 @@ void TmModuleRunInit(void) {
 }
 
 void TmModuleRunDeInit(void) {
-    TmModule *t;
+    TM_MODULES_T *t;
     uint16_t i;
 
     for (i = 0; i < TMM_SIZE; i++) {
@@ -123,7 +123,7 @@ void TmModuleRunDeInit(void) {
 /** \brief register all unittests for the tm modules */
 void TmModuleRegisterTests(void) {
 #ifdef UNITTESTS
-    TmModule *t;
+    TM_MODULES_T *t;
     uint16_t i;
 
     for (i = 0; i < TMM_SIZE; i++) {

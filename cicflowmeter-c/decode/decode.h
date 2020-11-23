@@ -8,11 +8,11 @@ extern "C" {
 //#define DBG_THREADS
 #define COUNTERS
 
-#include "decode-events.h"
-#include "flow-worker.h"
+#include "../flow/worker.h"
+#include "../thread/thread_t.h"
+#include "..utils/debug.h"
+#include "events.h"
 #include "suricata-common.h"
-#include "threadvars.h"
-#include "util-debug.h"
 
 #ifdef HAVE_NAPATECH
 #include "util-napatech.h"

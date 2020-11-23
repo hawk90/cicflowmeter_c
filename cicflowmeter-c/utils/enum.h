@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-typedef struct MAP_ {
+typedef struct _MAP_T {
     const char *key;
     int value;
 } MAP_T;

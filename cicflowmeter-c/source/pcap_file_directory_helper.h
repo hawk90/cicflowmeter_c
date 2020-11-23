@@ -15,24 +15,24 @@
  * 02110-1301, USA.
  */
 
-/**
- * \file
- *
- * \author Danny Browning <danny.browning@protectwise.com>
- */
-
-#include "queue.h"
-#include "source-pcap-file-helper.h"
-#include "suricata-common.h"
-
 #ifndef __SOURCE_PCAP_FILE_DIRECTORY_HELPER_H__
 #define __SOURCE_PCAP_FILE_DIRECTORY_HELPER_H__
 
-typedef struct PendingFile_ {
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "../common/cicflowmeter_common.h"
+#include "../common/queue.h"
+
+#include "pcap_filehelper.h"
+
+typedef struct _PENDING_FILE_T {
     char *filename;
     struct timespec modified_time;
     TAILQ_ENTRY(PendingFile_) next;
-} PendingFile;
+} PENDING_FILE_T;
+
 /**
  * Data specific to a directory of pcap files
  */
@@ -81,4 +81,8 @@ TmEcode PcapDetermineDirectoryOrFile(char *filename, DIR **directory);
  */
 TmEcode PcapDirectoryDispatch(PcapFileDirectoryVars *ptv);
 
-#endif /* __SOURCE_PCAP_FILE_DIRECTORY_HELPER_H__ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif

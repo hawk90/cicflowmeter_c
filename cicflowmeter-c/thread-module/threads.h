@@ -5,9 +5,9 @@
 extern "C" {
 #endif
 
-#include "tm-modules.h"
-#include "tm-threads-common.h"
-#include "tmqh-packetpool.h"
+#include "../queue-handler/packetpool.h"
+#include "modules.h"
+#include "threads_common.h"
 
 #ifdef OS_WIN32
 static inline void SleepUsec(uint64_t usec) {
@@ -26,31 +26,31 @@ static inline void SleepUsec(uint64_t usec) {
 #define TM_QUEUE_NAME_MAX 16
 #define TM_THREAD_NAME_MAX 16
 
-typedef TmEcode (*TmSlotFunc)(ThreadVars *, Packet *, void *);
+typedef TM_ERROR_T (*TmSlotFunc)(ThreadVars *, Packet *, void *);
 
-typedef struct TmSlot_ {
+typedef struct _TM_SLOT_T {
     /* function pointers */
     union {
         TmSlotFunc SlotFunc;
-        TmEcode (*PktAcqLoop)(ThreadVars *, void *, void *);
-        TmEcode (*Management)(ThreadVars *, void *);
+        TM_ERROR_T (*PktAcqLoop)(ThreadVars *, void *, void *);
+        TM_ERROR_T (*Management)(ThreadVars *, void *);
     };
     /** linked list of slots, used when a pipeline has multiple slots
      *  in a single thread. */
-    struct TmSlot_ *slot_next;
+    struct _TM_SLOT_T *slot_next;
 
     SC_ATOMIC_DECLARE(void *, slot_data);
 
-    TmEcode (*SlotThreadInit)(ThreadVars *, const void *, void **);
+    TM_ERROR_T (*SlotThreadInit)(ThreadVars *, const void *, void **);
     void (*SlotThreadExitPrintStats)(ThreadVars *, void *);
-    TmEcode (*SlotThreadDeinit)(ThreadVars *, void *);
+    TM_ERROR_T (*SlotThreadDeinit)(ThreadVars *, void *);
 
     /* data storage */
     const void *slot_initdata;
     /* store the thread module id */
     int tm_id;
 
-} TmSlot;
+} TM_SLOT_T;
 
 extern ThreadVars *tv_root[TVT_MAX];
 
@@ -71,7 +71,7 @@ ThreadVars *TmThreadCreateMgmtThreadByName(const char *name, const char *module,
                                            int mucond);
 ThreadVars *TmThreadCreateCmdThreadByName(const char *name, const char *module,
                                           int mucond);
-TmEcode TmThreadSpawn(ThreadVars *);
+TM_ERROR_T TmThreadSpawn(ThreadVars *);
 void TmThreadSetFlags(ThreadVars *, uint8_t);
 void TmThreadKillThreadsFamily(int family);
 void TmThreadKillThreads(void);
@@ -80,10 +80,10 @@ void TmThreadAppend(ThreadVars *, int);
 void TmThreadSetGroupName(ThreadVars *tv, const char *name);
 void TmThreadDumpThreads(void);
 
-TmEcode TmThreadSetCPUAffinity(ThreadVars *, uint16_t);
-TmEcode TmThreadSetThreadPriority(ThreadVars *, int);
-TmEcode TmThreadSetCPU(ThreadVars *, uint8_t);
-TmEcode TmThreadSetupOptions(ThreadVars *);
+TM_ERROR_T TmThreadSetCPUAffinity(ThreadVars *, uint16_t);
+TM_ERROR_T TmThreadSetThreadPriority(ThreadVars *, int);
+TM_ERROR_T TmThreadSetCPU(ThreadVars *, uint8_t);
+TM_ERROR_T TmThreadSetupOptions(ThreadVars *);
 void TmThreadSetPrio(ThreadVars *);
 int TmThreadGetNbThreads(uint8_t type);
 
@@ -94,17 +94,17 @@ void TmThreadContinueThreads(void);
 void TmThreadPause(ThreadVars *);
 void TmThreadPauseThreads(void);
 void TmThreadCheckThreadState(void);
-TmEcode TmThreadWaitOnThreadInit(void);
-ThreadVars *TmThreadsGetCallingThread(void);
+TM_ERROR_T TmThreadWaitOnThreadInit(void);
+THREAD_T *TmThreadsGetCallingThread(void);
 
 int TmThreadsCheckFlag(ThreadVars *, uint32_t);
 void TmThreadsSetFlag(ThreadVars *, uint32_t);
 void TmThreadsUnsetFlag(ThreadVars *, uint32_t);
 void TmThreadWaitForFlag(ThreadVars *, uint32_t);
 
-TmEcode TmThreadsSlotVarRun(ThreadVars *tv, Packet *p, TmSlot *slot);
+TM_ERROR_T TmThreadsSlotVarRun(ThreadVars *tv, Packet *p, TmSlot *slot);
 
-ThreadVars *TmThreadsGetTVContainingSlot(TmSlot *);
+THREAD_T *TmThreadsGetTVContainingSlot(TmSlot *);
 void TmThreadDisablePacketThreads(void);
 void TmThreadDisableReceiveThreads(void);
 TmSlot *TmThreadGetFirstTmSlotForPartialPattern(const char *);
@@ -147,7 +147,7 @@ static inline void TmThreadsHandleInjectedPackets(ThreadVars *tv) {
             Packet *extra_p = PacketDequeue(pq);
             SCMutexUnlock(&pq->mutex_q);
             if (extra_p == NULL) break;
-            TmEcode r = TmThreadsSlotVarRun(tv, extra_p, tv->tm_flowworker);
+            TM_ERROR_T r = TmThreadsSlotVarRun(tv, extra_p, tv->tm_flowworker);
             if (r == TM_ECODE_FAILED) {
                 TmThreadsSlotProcessPktFail(tv, tv->tm_flowworker, extra_p);
                 break;
@@ -160,14 +160,14 @@ static inline void TmThreadsHandleInjectedPackets(ThreadVars *tv) {
 /**
  *  \brief Process the rest of the functions (if any) and queue.
  */
-static inline TmEcode TmThreadsSlotProcessPkt(ThreadVars *tv, TmSlot *s,
-                                              Packet *p) {
+static inline TM_ERROR_T TmThreadsSlotProcessPkt(ThreadVars *tv, TmSlot *s,
+                                                 Packet *p) {
     if (s == NULL) {
         tv->tmqh_out(tv, p);
         return TM_ECODE_OK;
     }
 
-    TmEcode r = TmThreadsSlotVarRun(tv, p, s);
+    TM_ERROR_T r = TmThreadsSlotVarRun(tv, p, s);
     if (unlikely(r == TM_ECODE_FAILED)) {
         TmThreadsSlotProcessPktFail(tv, s, p);
         return TM_ECODE_FAILED;

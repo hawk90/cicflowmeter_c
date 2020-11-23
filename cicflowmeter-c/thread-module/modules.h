@@ -5,8 +5,8 @@
 extern "C" {
 #endif
 
-#include "threadvars.h"
-#include "tm-threads-common.h"
+#include "../thread/thread_t.h"
+#include "threads-common.h"
 
 /* thread flags */
 #define TM_FLAG_RECEIVE_TM 0x01
@@ -17,31 +17,31 @@ extern "C" {
 #define TM_FLAG_MANAGEMENT_TM 0x20
 #define TM_FLAG_COMMAND_TM 0x40
 
-typedef TmEcode (*ThreadInitFunc)(ThreadVars *, const void *, void **);
-typedef TmEcode (*ThreadDeinitFunc)(ThreadVars *, void *);
-typedef void (*ThreadExitPrintStatsFunc)(ThreadVars *, void *);
+typedef TM_ERROR (*ThreadInitFunc)(THREAD_T *, const void *, void **);
+typedef TM_ERROR (*ThreadDeinitFunc)(THREAD_T *, void *);
+typedef void (*ThreadExitPrintStatsFunc)(THREAD_T *, void *);
 
-typedef struct TmModule_ {
+typedef struct _TM_MODULES_T {
     const char *name;
 
     /** thread handling */
-    TmEcode (*ThreadInit)(ThreadVars *, const void *, void **);
-    void (*ThreadExitPrintStats)(ThreadVars *, void *);
-    TmEcode (*ThreadDeinit)(ThreadVars *, void *);
+    TM_ERROR (*ThreadInit)(THREAD_T *, const void *, void **);
+    void (*ThreadExitPrintStats)(THREAD_T *, void *);
+    TM_ERROR (*ThreadDeinit)(THREAD_T *, void *);
 
     /** the packet processing function */
-    TmEcode (*Func)(ThreadVars *, Packet *, void *);
+    TM_ERROR (*Func)(THREAD_T *, Packet *, void *);
 
-    TmEcode (*PktAcqLoop)(ThreadVars *, void *, void *);
+    TM_ERROR (*PktAcqLoop)(THREAD_T *, void *, void *);
 
     /** terminates the capture loop in PktAcqLoop */
-    TmEcode (*PktAcqBreakLoop)(ThreadVars *, void *);
+    TM_ERROR (*PktAcqBreakLoop)(THREAD_T *, void *);
 
-    TmEcode (*Management)(ThreadVars *, void *);
+    TM_ERROR (*Management)(THREAD_T *, void *);
 
     /** global Init/DeInit */
-    TmEcode (*Init)(void);
-    TmEcode (*DeInit)(void);
+    TM_ERROR (*Init)(void);
+    TM_ERROR (*DeInit)(void);
 #ifdef UNITTESTS
     void (*RegisterTests)(void);
 #endif
@@ -49,9 +49,9 @@ typedef struct TmModule_ {
                            the given TmModule */
     /* Other flags used by the module */
     uint8_t flags;
-} TmModule;
+} TM_MODULES_T;
 
-extern TmModule tmm_modules[TMM_SIZE];
+extern TM_MODULES_T tmm_modules[TMM_SIZE];
 
 /**
  * Structure that output modules use to maintain private data.
@@ -66,12 +66,12 @@ typedef struct OutputCtx_ {
     TAILQ_HEAD(, OutputModule_) submodules;
 } OutputCtx;
 
-TmModule *TmModuleGetByName(const char *name);
-TmModule *TmModuleGetById(int id);
+TM_MODULES_T *TmModuleGetByName(const char *name);
+TM_MODULES_T *TmModuleGetById(int id);
 int TmModuleGetIdByName(const char *name);
 int TmModuleGetIDForTM(TmModule *tm);
-TmEcode TmModuleRegister(char *name,
-                         int (*module_func)(ThreadVars *, Packet *, void *));
+TM_ERROR TmModuleRegister(char *name,
+                          int (*module_func)(THREAD_T *, Packet *, void *));
 void TmModuleDebugList(void);
 void TmModuleRegisterTests(void);
 const char *TmModuleTmmIdToString(TmmId id);

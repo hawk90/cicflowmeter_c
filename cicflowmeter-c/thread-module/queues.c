@@ -23,38 +23,38 @@
  * Thread module management functions
  */
 
-#include "suricata.h"
+//#include "suricata.h"
+#include "queues.h"
+#include "../utils/debug.h"
 #include "threads.h"
-#include "tm-queues.h"
-#include "util-debug.h"
 
-static TAILQ_HEAD(TmqList_, Tmq_) tmq_list = TAILQ_HEAD_INITIALIZER(tmq_list);
+static TAILQ_HEAD(TM_QUEUE_LIST_T_,
+                  TM_QUEUE_T_) tmq_list = TAILQ_HEAD_INITIALIZER(tmq_list);
 
 static uint16_t tmq_id = 0;
 
-Tmq *TmqCreateQueue(const char *name) {
-    Tmq *q = SCCalloc(1, sizeof(*q));
-    if (q == NULL) FatalError(SC_ERR_MEM_ALLOC, "SCCalloc failed");
+TM_QUEUE_T *create_tm_queue(const char *name) {
+    TM_QUEUE_T *q = SCCalloc(1, sizeof(*q));
+    if (q == NULL) FatalError(ERR_MEM_ALLOC, "SCCalloc failed");
 
     q->name = SCStrdup(name);
-    if (q->name == NULL) FatalError(SC_ERR_MEM_ALLOC, "SCStrdup failed");
+    if (q->name == NULL) FatalError(ERR_MEM_ALLOC, "SCStrdup failed");
 
     q->id = tmq_id++;
     q->is_packet_pool = (strcmp(q->name, "packetpool") == 0);
     if (!q->is_packet_pool) {
         q->pq = PacketQueueAlloc();
-        if (q->pq == NULL)
-            FatalError(SC_ERR_MEM_ALLOC, "PacketQueueAlloc failed");
+        if (q->pq == NULL) FatalError(ERR_MEM_ALLOC, "PacketQueueAlloc failed");
     }
 
     TAILQ_INSERT_HEAD(&tmq_list, q, next);
 
-    SCLogDebug("created queue \'%s\', %p", name, q);
+    LOG_DBG_MSG("created queue \'%s\', %p", name, q);
     return q;
 }
 
-Tmq *TmqGetQueueByName(const char *name) {
-    Tmq *tmq = NULL;
+TM_QUEUE_T *get_tm_queue_by_name(const char *name) {
+    TM_QUEUE_T *tmq = NULL;
     TAILQ_FOREACH(tmq, &tmq_list, next) {
         if (strcmp(tmq->name, name) == 0) return tmq;
     }
@@ -62,18 +62,19 @@ Tmq *TmqGetQueueByName(const char *name) {
 }
 
 void TmqDebugList(void) {
-    Tmq *tmq = NULL;
+    TM_QUEUE_T *tmq = NULL;
     TAILQ_FOREACH(tmq, &tmq_list, next) {
         /* get a lock accessing the len */
-        SCMutexLock(&tmq->pq->mutex_q);
-        printf("TmqDebugList: id %" PRIu32 ", name \'%s\', len %" PRIu32 "\n",
+        pthread_mutex_lock(&tmq->pq->mutex_q);
+        printf("TM_QUEUE_TDebugList: id %" PRIu32 ", name \'%s\', len %" PRIu32
+               "\n",
                tmq->id, tmq->name, tmq->pq->len);
-        SCMutexUnlock(&tmq->pq->mutex_q);
+        pthread_mutex_unlock(&tmq->pq->mutex_q);
     }
 }
 
 void TmqResetQueues(void) {
-    Tmq *tmq;
+    TM_QUEUE_T *tmq;
 
     while ((tmq = TAILQ_FIRST(&tmq_list))) {
         TAILQ_REMOVE(&tmq_list, tmq, next);
@@ -95,21 +96,21 @@ void TmqResetQueues(void) {
 void TmValidateQueueState(void) {
     bool err = false;
 
-    Tmq *tmq = NULL;
+    TM_QUEUE_T *tmq = NULL;
     TAILQ_FOREACH(tmq, &tmq_list, next) {
-        SCMutexLock(&tmq->pq->mutex_q);
+        pthread_mutex_lock(&tmq->pq->mutex_q);
         if (tmq->reader_cnt == 0) {
-            SCLogError(SC_ERR_THREAD_QUEUE,
-                       "queue \"%s\" doesn't have a reader (id %d max %u)",
-                       tmq->name, tmq->id, tmq_id);
+            LOG_ERR_MSG(ERR_THREAD_QUEUE,
+                        "queue \"%s\" doesn't have a reader (id %d max %u)",
+                        tmq->name, tmq->id, tmq_id);
             err = true;
         } else if (tmq->writer_cnt == 0) {
-            SCLogError(SC_ERR_THREAD_QUEUE,
-                       "queue \"%s\" doesn't have a writer (id %d, max %u)",
-                       tmq->name, tmq->id, tmq_id);
+            LOG_ERR_MSG(ERR_THREAD_QUEUE,
+                        "queue \"%s\" doesn't have a writer (id %d, max %u)",
+                        tmq->name, tmq->id, tmq_id);
             err = true;
         }
-        SCMutexUnlock(&tmq->pq->mutex_q);
+        pthread_mutex_unlock(&tmq->pq->mutex_q);
 
         if (err == true) goto error;
     }
@@ -117,5 +118,5 @@ void TmValidateQueueState(void) {
     return;
 
 error:
-    FatalError(SC_ERR_FATAL, "fatal error during threading setup");
+    FatalError(ERR_FATAL, "fatal error during threading setup");
 }
