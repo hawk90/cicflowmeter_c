@@ -5,16 +5,18 @@
 extern "C" {
 #endif
 
+#if 0
 void TmModuleReceivePcapRegister(void);
 void TmModuleDecodePcapRegister(void);
-void PcapTranslateIPToDevice(char *pcap_dev, size_t len);
+#endif
+
+void pcap_ip_to_device(char *pcap_dev, size_t len);
 
 #define LIBPCAP_COPYWAIT 500
 #define LIBPCAP_PROMISC 1
 
 #define PCAP_IFACE_NAME_LENGTH 128
 
-// TODO what is means?
 /* per packet Pcap vars */
 typedef struct PCAP_PACKET_T_ {
     uint32_t tenant_id;

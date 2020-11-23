@@ -1,4 +1,4 @@
-#include "cicflowmeter-c/common/cicflowmeter-common.h"
+#include "cicflowmeter-c/common/cicflowmeter_common.h"
 
 /* in flow dir*/
 #include "decode.h"

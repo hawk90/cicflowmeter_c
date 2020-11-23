@@ -1,5 +1,4 @@
-#define PCAP_STATE_DOWN 0
-#define PCAP_STATE_UP 1
+#define PCAP_STATE_DOWN 0 #define PCAP_STATE_UP 1
 
 #define PCAP_RECONNECT_TIMEOUT 500000
 
@@ -13,7 +12,7 @@
  * Requires pcap_stats() to be called before 32bit stats wrap around twice,
  * which we do.
  */
-typedef struct PcapStats64_ {
+typedef struct PCAP_STAT64_T {
     uint64_t recv;
     uint64_t drop;
     uint64_t ifdrop;
@@ -53,47 +52,6 @@ typedef struct PCAP_THREAD_T_ {
     PCAP_STATS64_T last_stats64;
 } PCAP_THREAD_T;
 
-#if 0
-static TmEcode ReceivePcapThreadInit(ThreadVars *, const void *, void **);
-static void ReceivePcapThreadExitStats(ThreadVars *, void *);
-static TmEcode ReceivePcapLoop(ThreadVars *tv, void *data, void *slot);
-static TmEcode ReceivePcapBreakLoop(ThreadVars *tv, void *data);
-
-static TmEcode DecodePcapThreadInit(ThreadVars *, const void *, void **);
-static TmEcode DecodePcapThreadDeinit(ThreadVars *tv, void *data);
-static TmEcode DecodePcap(ThreadVars *, Packet *, void *);
-
-/** protect pcap_compile and pcap_setfilter, as they are not thread safe:
- *  http://seclists.org/tcpdump/2009/q1/62 */
-static SCMutex pcap_bpf_compile_lock = SCMUTEX_INITIALIZER;
-
-/**
- * \brief Registration Function for ReceivePcap.
- */
-void TmModuleReceivePcapRegister (void)
-{
-    tmm_modules[TMM_RECEIVE_PCAP].name = "Receive Pcap";
-    tmm_modules[TMM_RECEIVE_PCAP].init_thread = init_receive_pcap_thread;
-    tmm_modules[TMM_RECEIVE_PCAP].pkt_acq_loop = receive_pcap_loop;
-    tmm_modules[TMM_RECEIVE_PCAP].pkt_acq_break_loop = receive_pcap_break_loop;
-    tmm_modules[TMM_RECEIVE_PCAP].thread_exit_printstats = ReceivePcapThreadExitStats;
-    tmm_modules[TMM_RECEIVE_PCAP].cap_flags = SC_CAP_NET_RAW;
-    tmm_modules[TMM_RECEIVE_PCAP].flags = TM_FLAG_RECEIVE_TM;
-}
-
-/**
- * \brief Registration Function for DecodePcap.
- */
-void TmModuleDecodePcapRegister (void)
-{
-    tmm_modules[TMM_DECODEPCAP].name = "DecodePcap";
-    tmm_modules[TMM_DECODEPCAP].ThreadInit = DecodePcapThreadInit;
-    tmm_modules[TMM_DECODEPCAP].Func = DecodePcap;
-    tmm_modules[TMM_DECODEPCAP].ThreadDeinit = DecodePcapThreadDeinit;
-    tmm_modules[TMM_DECODEPCAP].flags = TM_FLAG_DECODE_TM;
-}
-#endif
-
 /**
  * \brief Update 64 bit |last| value from |current32| value taking one
  * wrap-around into account.
@@ -111,6 +69,7 @@ static inline void update_pcap_stats_value64(uint64_t *last,
  * \brief Update 64 bit |last| stat values with values from |current|
  * 32 bit pcap_stat.
  */
+// DONE
 static inline void update_pcap_stats64(PCAP_STATS64_T *last_stats,
                                        const struct pcap_stat *current_stats) {
     update_pcap_stats_value64(&last_stats->recv, current_stats->recv);
@@ -118,6 +77,7 @@ static inline void update_pcap_stats64(PCAP_STATS64_T *last_stats,
     update_pcap_stats_value64(&last_stats->ifdrop, current_stats->ifdrop);
 }
 
+// DONE
 static inline int dump_pcap_counters(PCAP_THREAD_T *pcap_vars) {
     int rt = 0;
     struct pcap_stat stats;
@@ -144,6 +104,7 @@ error:
     return -1;
 }
 
+// DONE
 static int open_pcap(PCAP_THREAD_T *pcap_vars) {
     int rt = 0;
     pcap_vars->pcap_state = PCAP_STATE_DOWN;
@@ -165,6 +126,7 @@ error:
     return rt;
 }
 
+// TODO
 static void callback_loop(char *user, const struct pcap_pkthdr *header,
                           const char *bytes) {
     SCEnter();
@@ -172,10 +134,10 @@ static void callback_loop(char *user, const struct pcap_pkthdr *header,
     struct timeval current_time;
 
     PCAP_THREAD_T *pcap_vars = (PCAP_THREAD_T *)user;
-    Packet *pkt = PacketGetFromQueueOrAlloc();
+    PACKET_T *pkt = get_packet_from_queue_or_alloc();
 
     if (unlikely(p == NULL)) {
-        SCReturn;
+        return;
     }
 
     set_pkt_src(pkt, PKT_SRC_WIRE);
@@ -189,7 +151,7 @@ static void callback_loop(char *user, const struct pcap_pkthdr *header,
     (void)ATOMIC_ADD(pcap_vars->live_dev->pkts, 1);
     pkt->live_dev = pcap_vars->live_dev;
 
-    if (unlikely(PacketCopyData(p, pkt, h->caplen))) {
+    if (unlikely(copy_packet_data(p, pkt, h->caplen))) {
         TmqhOutputPacketpool(pcap_vars->tv, pkt);
         SCReturn;
     }
@@ -234,7 +196,8 @@ static void callback_loop(char *user, const struct pcap_pkthdr *header,
 /**
  *  \brief Main PCAP reading Loop function
  */
-static TmEcode receive_pcap_loop(ThreadVars *tv, void *data, void *slot) {
+// TODO
+static TM_ERROR_T receive_pcap_loop(ThreadVars *tv, void *data, void *slot) {
     SCEnter();
 
     int rt = 0;
@@ -294,7 +257,8 @@ static TmEcode receive_pcap_loop(ThreadVars *tv, void *data, void *slot) {
 /**
  * \brief PCAP Break Loop function.
  */
-static TmEcode receive_pcap_break_loop(ThreadVars *tv, void *data) {
+// TODO
+static TM_ERROR_T receive_pcap_break_loop(ThreadVars *tv, void *data) {
     SCEnter();
     PCAP_THREAD_T *pcap_vars = (PCAP_THREAD_T *)data;
     if (pcap_vars->pcap_handle == NULL) {
@@ -319,8 +283,10 @@ static TmEcode receive_pcap_break_loop(ThreadVars *tv, void *data) {
  *
  * \todo Create a general pcap setup function.
  */
-static TmEcode ReceivePcapThreadInit(ThreadVars *tv, const void *initdata,
-                                     void **data) {
+
+// TODO
+static TM_ERROR_T ReceivePcapThreadInit(ThreadVars *tv, const void *initdata,
+                                        void **data) {
     SCEnter();
     PcapIfaceConfig *pcapconfig = (PcapIfaceConfig *)initdata;
 
@@ -480,6 +446,7 @@ static TmEcode ReceivePcapThreadInit(ThreadVars *tv, const void *initdata,
  * \param tv pointer to ThreadVars
  * \param data pointer that gets cast into PCAP_THREAD_T for pcap_vars
  */
+// TODO
 static void receive_pcap_thread_exit_stats(THREAD_T *thread, void *data) {
     SCEnter();
     PCAP_THREAD_T *pcap_vars = (PCAP_THREAD_T *)data;
@@ -528,7 +495,8 @@ static void receive_pcap_thread_exit_stats(THREAD_T *thread, void *data) {
  * \param p pointer to the current packet
  * \param data pointer that gets cast into PCAP_THREAD_T for pcap_vars
  */
-static TmEcode decode_pcap(THREAD_T *thread, PACKET *pkt, void *data) {
+// TODO
+static TM_ERROR_T decode_pcap(THREAD_T *thread, PACKET *pkt, void *data) {
     SCEnter();
     DECODE_THREAD_T *decode_thread = (DECODE_THREAD_T *)data;
 
@@ -545,8 +513,9 @@ static TmEcode decode_pcap(THREAD_T *thread, PACKET *pkt, void *data) {
     ReturnInt(TM_ECODE_OK);
 }
 
-static TmEcode init_decode_pcap_thread(THREAD_T *thread, const void *init_data,
-                                       void **data) {
+// TODO
+static TM_ERROR_T init_decode_pcap_thread(THREAD_T *thread,
+                                          const void *init_data, void **data) {
     SCEnter();
 
     DECODE_THREAD_T *decode_thread = alloc_decode_thread_vars(thread);
@@ -563,9 +532,9 @@ error:
     ReturnInt(TM_ECODE_FAILED);
 }
 
-static TmEcode deinit_decode_pcap_thread(ThreadVars *thread_var, void *data) {
-    // TODO: case - data is NULL
-
+// TODO
+static TM_ERROR_T deinit_decode_pcap_thread(ThreadVars *thread_var,
+                                            void *data) {
     if (data != NULL) free_decode_thread_vars(thread_var, data);
     ReturnInt(TM_ECODE_OK);
 }

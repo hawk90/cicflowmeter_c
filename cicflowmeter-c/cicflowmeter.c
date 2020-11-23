@@ -1,4 +1,4 @@
-#include "common/cicflowmeter-common.h"
+#include "common/cicflowmeter_common.h"
 
 #include "util/debug.h"
 
