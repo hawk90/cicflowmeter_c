@@ -20,16 +20,17 @@
 #include "checksum.h"
 #include "debug.h"
 
-/*
-int recalculate_checksum(Packet *p) {
-    if (PKT_IS_IPV4(p)) {
-        if (PKT_IS_TCP(p)) {
+#include "../decode/decode.h"
+
+int recalculate_checksum(PACKET_T *p) {
+    if (IS_IPV4(p)) {
+        if (IS_TCP(p)) {
             // TCP
             p->tcph->th_sum = 0;
             p->tcph->th_sum =
                 TCPChecksum(p->ip4h->s_ip_addrs, (uint16_t *)p->tcph,
                             (p->payload_len + TCP_GET_HLEN(p)), 0);
-        } else if (PKT_IS_UDP(p)) {
+        } else if (IS_UDP(p)) {
             p->udph->uh_sum = 0;
             p->udph->uh_sum =
                 UDPV4Checksum(p->ip4h->s_ip_addrs, (uint16_t *)p->udph,
@@ -39,24 +40,11 @@ int recalculate_checksum(Packet *p) {
         p->ip4h->ip_csum = 0;
         p->ip4h->ip_csum =
             IPV4Checksum((uint16_t *)p->ip4h, IPV4_GET_RAW_HLEN(p->ip4h), 0);
-    } else if (PKT_IS_IPV6(p)) {
-        // just TCP for IPV6
-        if (PKT_IS_TCP(p)) {
-            p->tcph->th_sum = 0;
-            p->tcph->th_sum =
-                TCPV6Checksum(p->ip6h->s_ip6_addrs, (uint16_t *)p->tcph,
-                              (p->payload_len + TCP_GET_HLEN(p)), 0);
-        } else if (PKT_IS_UDP(p)) {
-            p->udph->uh_sum = 0;
-            p->udph->uh_sum =
-                UDPV6Checksum(p->ip6h->s_ip6_addrs, (uint16_t *)p->udph,
-                              (p->payload_len + UDP_HEADER_LEN), 0);
-        }
     }
 
     return 0;
 }
-*/
+
 /**
  *  \brief Check if the number of invalid checksums indicate checksum
  *         offloading in place.

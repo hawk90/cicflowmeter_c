@@ -29,9 +29,9 @@
 #include "threads.h"
 
 static TAILQ_HEAD(TM_QUEUE_LIST_T_,
-                  TM_QUEUE_T_) tmq_list = TAILQ_HEAD_INITIALIZER(tmq_list);
+                  TM_QUEUE_T_) q_list = TAILQ_HEAD_INITIALIZER(q_list);
 
-static uint16_t tmq_id = 0;
+static uint16_t q_id = 0;
 
 TM_QUEUE_T *create_tm_queue(const char *name) {
     TM_QUEUE_T *q = SCCalloc(1, sizeof(*q));
@@ -40,53 +40,53 @@ TM_QUEUE_T *create_tm_queue(const char *name) {
     q->name = SCStrdup(name);
     if (q->name == NULL) FatalError(ERR_MEM_ALLOC, "SCStrdup failed");
 
-    q->id = tmq_id++;
+    q->id = q_id++;
     q->is_packet_pool = (strcmp(q->name, "packetpool") == 0);
     if (!q->is_packet_pool) {
-        q->pq = PacketQueueAlloc();
+        q->pq = packet_queue_alloc();
         if (q->pq == NULL) FatalError(ERR_MEM_ALLOC, "PacketQueueAlloc failed");
     }
 
-    TAILQ_INSERT_HEAD(&tmq_list, q, next);
+    TAILQ_INSERT_HEAD(&q_list, q, next);
 
     LOG_DBG_MSG("created queue \'%s\', %p", name, q);
     return q;
 }
 
 TM_QUEUE_T *get_tm_queue_by_name(const char *name) {
-    TM_QUEUE_T *tmq = NULL;
-    TAILQ_FOREACH(tmq, &tmq_list, next) {
-        if (strcmp(tmq->name, name) == 0) return tmq;
+    TM_QUEUE_T *q = NULL;
+    TAILQ_FOREACH(q, &q_list, next) {
+        if (strcmp(q->name, name) == 0) return q;
     }
     return NULL;
 }
 
 void TmqDebugList(void) {
-    TM_QUEUE_T *tmq = NULL;
-    TAILQ_FOREACH(tmq, &tmq_list, next) {
+    TM_QUEUE_T *q = NULL;
+    TAILQ_FOREACH(q, &q_list, next) {
         /* get a lock accessing the len */
-        pthread_mutex_lock(&tmq->pq->mutex_q);
+        pthread_mutex_lock(&q->pq->mutex_q);
         printf("TM_QUEUE_TDebugList: id %" PRIu32 ", name \'%s\', len %" PRIu32
                "\n",
-               tmq->id, tmq->name, tmq->pq->len);
-        pthread_mutex_unlock(&tmq->pq->mutex_q);
+               q->id, q->name, q->pq->len);
+        pthread_mutex_unlock(&q->pq->mutex_q);
     }
 }
 
 void TmqResetQueues(void) {
-    TM_QUEUE_T *tmq;
+    TM_QUEUE_T *q;
 
-    while ((tmq = TAILQ_FIRST(&tmq_list))) {
-        TAILQ_REMOVE(&tmq_list, tmq, next);
-        if (tmq->name) {
-            SCFree(tmq->name);
+    while ((q = TAILQ_FIRST(&q_list))) {
+        TAILQ_REMOVE(&q_list, q, next);
+        if (q->name) {
+            SCFree(q->name);
         }
-        if (tmq->pq) {
-            PacketQueueFree(tmq->pq);
+        if (q->pq) {
+            PacketQueueFree(q->pq);
         }
-        SCFree(tmq);
+        SCFree(q);
     }
-    tmq_id = 0;
+    q_id = 0;
 }
 
 /**
@@ -96,21 +96,21 @@ void TmqResetQueues(void) {
 void TmValidateQueueState(void) {
     bool err = false;
 
-    TM_QUEUE_T *tmq = NULL;
-    TAILQ_FOREACH(tmq, &tmq_list, next) {
-        pthread_mutex_lock(&tmq->pq->mutex_q);
-        if (tmq->reader_cnt == 0) {
+    TM_QUEUE_T *q = NULL;
+    TAILQ_FOREACH(q, &q_list, next) {
+        pthread_mutex_lock(&q->pq->mutex_q);
+        if (q->reader_cnt == 0) {
             LOG_ERR_MSG(ERR_THREAD_QUEUE,
                         "queue \"%s\" doesn't have a reader (id %d max %u)",
-                        tmq->name, tmq->id, tmq_id);
+                        q->name, q->id, q_id);
             err = true;
-        } else if (tmq->writer_cnt == 0) {
+        } else if (q->writer_cnt == 0) {
             LOG_ERR_MSG(ERR_THREAD_QUEUE,
                         "queue \"%s\" doesn't have a writer (id %d, max %u)",
-                        tmq->name, tmq->id, tmq_id);
+                        q->name, q->id, q_id);
             err = true;
         }
-        pthread_mutex_unlock(&tmq->pq->mutex_q);
+        pthread_mutex_unlock(&q->pq->mutex_q);
 
         if (err == true) goto error;
     }

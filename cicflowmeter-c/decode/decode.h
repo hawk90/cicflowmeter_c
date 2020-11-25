@@ -8,15 +8,27 @@ extern "C" {
 //#define DBG_THREADS
 #define COUNTERS
 
-#include "../flow/worker.h"
-#include "../thread/thread_t.h"
-#include "..utils/debug.h"
-#include "events.h"
-#include "suricata-common.h"
+#include "../common/cicflowmeter_common.h"
 
-#ifdef HAVE_NAPATECH
-#include "util-napatech.h"
-#endif /* HAVE_NAPATECH */
+#include "ethernet.h"
+#include "events.h"
+#include "icmpv4.h"
+#include "ipv4.h"
+#include "null.h"
+#include "raw.h"
+#include "tcp.h"
+#include "udp.h"
+
+/*
+#include "../flow/worker.h"
+#include "../source/pcap.h"
+#include "../thread/thread_t.h"
+#include "../utils/debug.h"
+
+#include "action-globals.h"
+#include "app-layer-protos.h"
+#include "detect-reference.h"
+*/
 
 typedef enum {
     CHECKSUM_VALIDATION_DISABLE,
@@ -24,9 +36,9 @@ typedef enum {
     CHECKSUM_VALIDATION_AUTO,
     CHECKSUM_VALIDATION_RXONLY,
     CHECKSUM_VALIDATION_KERNEL,
-} ChecksumValidationMode;
+} CHECK_SUM_VALIDATION_MODE;
 
-enum PktSrcEnum {
+enum PKT_SRC_ENUM {
     PKT_SRC_WIRE = 1,
     PKT_SRC_DECODER_IPV4,
     PKT_SRC_DEFRAG,
@@ -35,22 +47,6 @@ enum PktSrcEnum {
     PKT_SRC_DETECT_RELOAD_FLUSH,
     PKT_SRC_CAPTURE_TIMEOUT,
 };
-
-#include "source-pcap.h"
-
-#include "action-globals.h"
-
-#include "decode-ethernet.h"
-#include "decode-icmpv4.h"
-#include "decode-ipv4.h"
-#include "decode-null.h"
-#include "decode-raw.h"
-#include "decode-tcp.h"
-#include "decode-udp.h"
-
-#include "detect-reference.h"
-
-#include "app-layer-protos.h"
 
 /* forward declarations */
 struct DetectionEngineThreadCtx_;
@@ -199,13 +195,13 @@ typedef uint16_t Port;
 
 /* structure to store the sids/gids/etc the detection engine
  * found in this packet */
-typedef struct PacketAlert_ {
+typedef struct _PACKET_ALERT_T {
     SigIntId num;   /* Internal num, used for sorting */
     uint8_t action; /* Internal num, used for sorting */
     uint8_t flags;
     const struct Signature_ *s;
     uint64_t tx_id;
-} PacketAlert;
+} PACKET_ALERT_T;
 
 /** After processing an alert by the thresholding module, if at
  *  last it gets triggered, we might want to stick the drop action to
@@ -222,34 +218,34 @@ typedef struct PacketAlert_ {
 
 #define PACKET_ALERT_MAX 15
 
-typedef struct PacketAlerts_ {
+typedef struct _PACKET_ALERTS_T {
     uint16_t cnt;
-    PacketAlert alerts[PACKET_ALERT_MAX];
+    PACKET_ALERT_T alerts[PACKET_ALERT_MAX];
     /* single pa used when we're dropping,
      * so we can log it out in the drop log. */
-    PacketAlert drop;
-} PacketAlerts;
+    PACKET_ALERT_T drop;
+} PACKET_ALERTS_T;
 
 /** number of decoder events we support per packet. Power of 2 minus 1
  *  for memory layout */
 #define PACKET_EVENT_MAX 15
 
 /** data structure to store decoder, defrag and stream events */
-typedef struct PacketEvents_ {
+typedef struct _PACKET_EVENTS_T {
     uint8_t cnt;                      /**< number of events */
     uint8_t events[PACKET_EVENT_MAX]; /**< array of events */
-} PacketEvents;
+} PACKET_EVENTS_T;
 
-typedef struct PktVar_ {
+typedef struct _PACKET_VARS_T {
     uint32_t id;
-    struct PktVar_ *next; /* right now just implement this as a list,
-                           * in the long run we have thing of something
-                           * faster. */
+    struct _PACKET_VAR_T *next; /* right now just implement this as a list,
+                                 * in the long run we have thing of something
+                                 * faster. */
     uint16_t key_len;
     uint16_t value_len;
     uint8_t *key;
     uint8_t *value;
-} PACKT_QUEUE_T;
+} PACKET_VARS_T;
 
 #ifdef PROFILING
 
@@ -319,7 +315,7 @@ typedef struct PktProfiling_ {
 #endif /* PROFILING */
 
 /* forward declaration since Packet struct definition requires this */
-struct PacketQueue_;
+struct PACKET_QUEUE_T;
 
 /* sizes of the members:
  * src: 17 bytes
@@ -337,7 +333,7 @@ struct PacketQueue_;
  *
  * sum of above 44/48 bytes
  */
-typedef struct Packet_ {
+typedef struct _PACKET_T {
     /* Addresses, Ports and protocol
      * these are on top so we can use
      * the Packet as a hash key */
@@ -385,16 +381,16 @@ typedef struct Packet_ {
     };
 
     /** The release function for packet structure and data */
-    void (*ReleasePacket)(struct Packet_ *);
+    void (*ReleasePacket)(struct PACKT_T *);
     /** The function triggering bypass the flow in the capture method.
      * Return 1 for success and 0 on error */
-    int (*BypassPacketsFlow)(struct Packet_ *);
+    int (*BypassPacketsFlow)(struct PACKT_T *);
 
     /* pkt vars */
-    PktVar *pktvar;
+    PACKET_VAR_T *pkt_var;
 
     /* header pointers */
-    EthernetHdr *ethh;
+    EthernetHdr *eth_hdr;
 
     /* Checksum for IP packets. */
     int32_t level3_comp_csum;
@@ -403,27 +399,21 @@ typedef struct Packet_ {
 
     IPV4Hdr *ip4h;
 
-    IPV6Hdr *ip6h;
-
     /* IPv4 and IPv6 are mutually exclusive */
     union {
         IPV4Vars ip4vars;
-        struct {
-            IPV6Vars ip6vars;
-            IPV6ExtHdrs ip6eh;
-        };
     };
     /* Can only be one of TCP, UDP, ICMP at any given time */
     union {
-        TCPVars tcpvars;
+        TCPVars tcp_vars;
         ICMPV4Vars icmpv4vars;
-        ICMPV6Vars icmpv6vars;
     } l4vars;
+
 #define tcpvars l4vars.tcpvars
 #define icmpv4vars l4vars.icmpv4vars
 #define icmpv6vars l4vars.icmpv6vars
 
-    TCPHdr *tcph;
+    TCP_HDR_T *tcp_hdr;
 
     UDPHdr *udph;
 
@@ -447,7 +437,7 @@ typedef struct Packet_ {
     /* Incoming interface */
     struct LiveDevice_ *livedev;
 
-    PacketAlerts alerts;
+    PACKET_ALERTS_T alerts;
 
     struct Host_ *host_src;
     struct Host_ *host_dst;
@@ -461,24 +451,24 @@ typedef struct Packet_ {
     AppLayerDecoderEvents *app_layer_events;
 
     /* double linked list ptrs */
-    struct Packet_ *next;
-    struct Packet_ *prev;
+    struct _PACKET_T *next;
+    struct _PACKET_T *prev;
 
     /** data linktype in host order */
     int datalink;
 
     /* tunnel/encapsulation handling */
-    struct Packet_ *root; /* in case of tunnel this is a ptr
-                           * to the 'real' packet, the one we
-                           * need to set the verdict on --
-                           * It should always point to the lowest
-                           * packet in a encapsulated packet */
+    struct _PACKET_T *root; /* in case of tunnel this is a ptr
+                             * to the 'real' packet, the one we
+                             * need to set the verdict on --
+                             * It should always point to the lowest
+                             * packet in a encapsulated packet */
 
     /** mutex to protect access to:
      *  - tunnel_rtv_cnt
      *  - tunnel_tpr_cnt
      */
-    SCMutex tunnel_mutex;
+    pthread_mutex_t tunnel_mutex;
     /* ready to set verdict counter, only set in root */
     uint16_t tunnel_rtv_cnt;
     /* tunnel packet ref count */
@@ -492,12 +482,6 @@ typedef struct Packet_ {
      */
     struct PktPool_ *pool;
 
-#ifdef PROFILING
-    PktProfiling *profile;
-#endif
-#ifdef HAVE_NAPATECH
-    NapatechPacketVars ntpv;
-#endif
 } PACKET_T;
 
 /** highest mtu of the interfaces we monitor */
@@ -509,10 +493,10 @@ extern int g_default_mtu;
 /* storage: maximum ip packet size + link header */
 #define MAX_PAYLOAD_SIZE (IPV6_HEADER_LEN + 65536 + 28)
 extern uint32_t default_packet_size;
-#define SIZE_OF_PACKET (default_packet_size + sizeof(Packet))
+#define SIZE_OF_PACKET (default_packet_size + sizeof(PACKET_T))
 
 /** \brief Structure to hold thread specific data for all decode modules */
-typedef struct DecodeThreadVars_ {
+typedef struct _THREAD_VARS_T {
     /** Specific context for udp protocol detection (here atm) */
     AppLayerThreadCtx *app_tctx;
 
@@ -574,7 +558,7 @@ typedef struct DecodeThreadVars_ {
      * flow recycle during lookups */
     void *output_flow_thread_data;
 
-} DecodeThreadVars;
+} THREAD_VARS_T;
 
 typedef struct CaptureStats_ {
     uint16_t counter_ips_accepted;
@@ -584,8 +568,8 @@ typedef struct CaptureStats_ {
 
 } CaptureStats;
 
-void CaptureStatsUpdate(ThreadVars *tv, CaptureStats *s, const Packet *p);
-void CaptureStatsSetup(ThreadVars *tv, CaptureStats *s);
+void CaptureStatsUpdate(THREAD_T *thread, CaptureStats *s, const PACKET_T *pkt);
+void CaptureStatsSetup(THREAD_T *thread, CaptureStats *s);
 
 #define PACKET_CLEAR_L4VARS(p)                           \
     do {                                                 \
@@ -781,63 +765,55 @@ void CaptureStatsSetup(ThreadVars *tv, CaptureStats *s);
 #define IS_TUNNEL_PKT_VERDICTED(p) (((p)->flags & PKT_TUNNEL_VERDICTED))
 #define SET_TUNNEL_PKT_VERDICTED(p) ((p)->flags |= PKT_TUNNEL_VERDICTED)
 
-Packet *PacketTunnelPktSetup(ThreadVars *tv, DecodeThreadVars *dtv,
-                             Packet *parent, const uint8_t *pkt, uint32_t len,
-                             enum DecodeTunnelProto proto);
-Packet *PacketDefragPktSetup(Packet *parent, const uint8_t *pkt, uint32_t len,
-                             uint8_t proto);
-void PacketDefragPktSetupParent(Packet *parent);
-void DecodeRegisterPerfCounters(DecodeThreadVars *, ThreadVars *);
-Packet *PacketGetFromQueueOrAlloc(void);
-Packet *PacketGetFromAlloc(void);
-void PacketDecodeFinalize(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p);
-void PacketUpdateEngineEventCounters(ThreadVars *tv, DecodeThreadVars *dtv,
-                                     Packet *p);
-void PacketFree(Packet *p);
-void PacketFreeOrRelease(Packet *p);
-int PacketCallocExtPkt(Packet *p, int datalen);
-int PacketCopyData(Packet *p, const uint8_t *pktdata, uint32_t pktlen);
-int PacketSetData(Packet *p, const uint8_t *pktdata, uint32_t pktlen);
-int PacketCopyDataOffset(Packet *p, uint32_t offset, const uint8_t *data,
+PACKET_T *PacketTunnelPktSetup(THREAD_T *thread, THREAD_VARS_T *thread_vars,
+                               PACKET_T *parent, const uint8_t *raw,
+                               uint32_t len, enum DecodeTunnelProto proto);
+PACKET_T *PacketDefragPktSetup(PACKET_T *parent, const uint8_t *raw,
+                               uint32_t len, uint8_t proto);
+void PacketDefragPktSetupParent(PACKET_T *parent);
+void DecodeRegisterPerfCounters(THREAD_VARS_T *, THREAD_T *);
+PACKET_T *PacketGetFromQueueOrAlloc(void);
+PACKET_T *PacketGetFromAlloc(void);
+void PacketDecodeFinalize(THREAD_T *thread, THREAD_VARS_T *thread_vars,
+                          PACKET_T *pkt);
+void PacketUpdateEngineEventCounters(THREAD_T *thread,
+                                     THREAD_VARS_T *thread_vars, PACKET_T *pkt);
+void free_packet(PACKET_T *pkt);
+void PacketFreeOrRelease(PACKET_T *pkt);
+int PacketCallocExtPkt(PACKET_T *pkt, int datalen);
+int PacketCopyData(PACKET_T *pkt, const uint8_t *raw, uint32_t pktlen);
+int PacketSetData(PACKET_T *pkt, const uint8_t *raw, uint32_t pktlen);
+int PacketCopyDataOffset(PACKET_T *pkt, uint32_t offset, const uint8_t *raw,
                          uint32_t datalen);
 const char *PktSrcToString(enum PktSrcEnum pkt_src);
-void PacketBypassCallback(Packet *p);
-void PacketSwap(Packet *p);
+void PacketBypassCallback(PACKET_T *pkt);
+void PacketSwap(PACKET_T *pkt);
 
-DecodeThreadVars *DecodeThreadVarsAlloc(ThreadVars *);
-void DecodeThreadVarsFree(ThreadVars *, DecodeThreadVars *);
-void DecodeUpdatePacketCounters(ThreadVars *tv, const DecodeThreadVars *dtv,
-                                const Packet *p);
+THREAD_VARS_T *alloc_thread_vars(THREAD_T *);
+void DecodeThreadVarsFree(THREAD_T *, THREAD_VARS_T *);
+void DecodeUpdatePacketCounters(THREAD_T *thread,
+                                const THREAD_VARS_T *thread_vars,
+                                const PACKET_T *pkt);
 
 /* decoder functions */
-int DecodeEthernet(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *,
-                   uint32_t);
-int DecodeRaw(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *,
-              uint32_t);
-int DecodeIPV4(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *,
+int decode_ethernet(THREAD_T *, THREAD_VARS_T *, PACKET_T *, const uint8_t *,
+                    uint32_t);
+int decode_raw(THREAD_T *, THREAD_VARS_T *, PACKET_T *, const uint8_t *,
+               uint32_t);
+int decode_ipv4(THREAD_T *, THREAD_VARS_T *, PACKET_T *, const uint8_t *,
+                uint16_t);
+int decode_icmpv4(THREAD_T *, THREAD_VARS_T *, PACKET_T *, const uint8_t *,
+                  uint32_t);
+int decode_tcp(THREAD_T *, THREAD_VARS_T *, PACKET_T *, const uint8_t *,
                uint16_t);
-int DecodeIPV6(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *,
+int decode_udp(THREAD_T *, THREAD_VARS_T *, PACKET_T *, const uint8_t *,
                uint16_t);
-int DecodeICMPV4(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *,
-                 uint32_t);
-int DecodeICMPV6(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *,
-                 uint32_t);
-int DecodeTCP(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *,
-              uint16_t);
-int DecodeUDP(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *,
-              uint16_t);
-int DecodeTEMPLATE(ThreadVars *, DecodeThreadVars *, Packet *, const uint8_t *,
-                   uint32_t);
+int decode_template(THREAD_T *, THREAD_VARS_T *, PACKET_T *, const uint8_t *,
+                    uint32_t);
+void AddressDebugPrint(ADDR_T *);
 
-#ifdef UNITTESTS
-void DecodeIPV6FragHeader(Packet *p, const uint8_t *pkt, uint16_t hdrextlen,
-                          uint16_t plen, uint16_t prev_hdrextlen);
-#endif
-
-void AddressDebugPrint(Address *);
-
-typedef int (*DecoderFunc)(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p,
-                           const uint8_t *pkt, uint32_t len);
+typedef int (*decode_func)(THREAD_T *thread, THREAD_VARS_T *thread_var,
+                           PACKET_T *pkt, const uint8_t *raw, uint32_t len);
 void DecodeGlobalConfig(void);
 void DecodeUnregisterCounters(void);
 
@@ -1045,43 +1021,39 @@ void DecodeUnregisterCounters(void);
  *
  *  Otherwise, a future packet will issue the verdict.
  */
-static inline void DecodeLinkLayer(ThreadVars *tv, DecodeThreadVars *dtv,
-                                   const int datalink, Packet *p,
-                                   const uint8_t *data, const uint32_t len) {
+static inline void decode_linklayer(THREAD_T *thread,
+                                    THREAD_VARS_T *thread_vars,
+                                    const int datalink, PACKET_T *pkt,
+                                    const uint8_t *raw, const uint32_t len) {
     /* call the decoder */
     switch (datalink) {
         case LINKTYPE_ETHERNET:
-            DecodeEthernet(tv, dtv, p, data, len);
+            decode_ethernet(thread, thread_vars, pkt, raw, len);
             break;
         default:
-            SCLogError(SC_ERR_DATALINK_UNIMPLEMENTED,
-                       "datalink type "
-                       "%" PRId32 " not yet supported",
-                       datalink);
+            LOG_ERR_MSG(SC_ERR_DATALINK_UNIMPLEMENTED,
+                        "datalink type "
+                        "%" PRId32 " not yet supported",
+                        datalink);
             break;
     }
 }
 
 /** \brief decode network layer
  *  \retval bool true if successful, false if unknown */
-static inline bool DecodeNetworkLayer(ThreadVars *tv, DecodeThreadVars *dtv,
-                                      const uint16_t proto, Packet *p,
-                                      const uint8_t *data, const uint32_t len) {
+static inline bool decode_networklayer(THREAD_T *thread,
+                                       THREAD_VARS_T *thread_vars,
+                                       const uint16_t proto, PACKET_T *pkt,
+                                       const uint8_t *raw, const uint32_t len) {
     switch (proto) {
         case ETHERNET_TYPE_IP: {
             uint16_t ip_len =
                 (len < USHRT_MAX) ? (uint16_t)len : (uint16_t)USHRT_MAX;
-            decode_ipv4(tv, dtv, p, data, ip_len);
-            break;
-        }
-        case ETHERNET_TYPE_IPV6: {
-            uint16_t ip_len =
-                (len < USHRT_MAX) ? (uint16_t)len : (uint16_t)USHRT_MAX;
-            decode_ipv6(tv, dtv, p, data, ip_len);
+            decode_ipv4(thread, thread_vars, pkt, raw, ip_len);
             break;
         }
         default:
-            SCLogDebug("unknown ether type: %" PRIx16 "", proto);
+            LOG_DBG_MSG("unknown ether type: %" PRIx16 "", proto);
             return false;
     }
     return true;

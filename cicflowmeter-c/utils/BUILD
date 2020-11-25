@@ -6,5 +6,5 @@ cc_library(
 	name = "utils-dep",
 	srcs = glob(["*.c"]),
 	hdrs = glob(["*.h"]),
-	deps = ["//cicflowmeter-c/common:common-dep"],
+	deps = ["//cicflowmeter-c/common:common-dep", "//cicflowmeter-c/decode:decode-dep"],
 )

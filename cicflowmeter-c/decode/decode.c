@@ -24,29 +24,18 @@ extern bool stats_decoder_events;
 extern const char *stats_decoder_events_prefix;
 extern bool stats_stream_events;
 
-int DecodeTunnel(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p,
-                 const uint8_t *pkt, uint32_t len,
-                 enum DecodeTunnelProto proto) {
+int decode_tunnel(THREAD_T *thread, THREAD_VARS_T *thread_vars, PACKET_T *pkt,
+                  const uint8_t *raw, uint32_t len,
+                  enum DecodeTunnelProto proto) {
     switch (proto) {
-        case DECODE_TUNNEL_PPP:
-            return DecodePPP(tv, dtv, p, pkt, len);
         case DECODE_TUNNEL_IPV4:
-            return DecodeIPV4(tv, dtv, p, pkt, len);
-        case DECODE_TUNNEL_IPV6:
-        case DECODE_TUNNEL_IPV6_TEREDO:
-            return DecodeIPV6(tv, dtv, p, pkt, len);
-        case DECODE_TUNNEL_VLAN:
-            return DecodeVLAN(tv, dtv, p, pkt, len);
+            return decode_ipv4(thread, thread_vars, pkt, raw, len);
         case DECODE_TUNNEL_ETHERNET:
-            return DecodeEthernet(tv, dtv, p, pkt, len);
-        case DECODE_TUNNEL_ERSPANII:
-            return DecodeERSPAN(tv, dtv, p, pkt, len);
-        case DECODE_TUNNEL_ERSPANI:
-            return DecodeERSPANTypeI(tv, dtv, p, pkt, len);
+            return decode_ethernet(thread, thread_vars, pkt, raw, len);
         default:
-            SCLogDebug("FIXME: DecodeTunnel: protocol %" PRIu32
-                       " not supported.",
-                       proto);
+            LOG_DBG_MSG("FIXME: DecodeTunnel: protocol %" PRIu32
+                        " not supported.",
+                        proto);
             break;
     }
     return TM_ECODE_OK;
@@ -55,9 +44,9 @@ int DecodeTunnel(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p,
 /**
  * \brief Return a malloced packet.
  */
-void PacketFree(Packet *p) {
-    PACKET_DESTRUCTOR(p);
-    SCFree(p);
+void free_packet(PACKET_T *pkt) {
+    PACKET_DESTRUCTOR(pkt);
+    SCFree(pkt);
 }
 
 /**

@@ -35,8 +35,8 @@ typedef struct PCAP_THREAD_T_ {
     uint16_t capture_kernel_drops;
     uint16_t capture_kernel_ifdrops;
 
-    ThreadVars *tv;
-    TmSlot *slot;
+    THREAD_T *thread;
+    TM_SLOT_T *slot;
 
     /** callback result -- set if one of the thread module failed. */
     int callback_result;

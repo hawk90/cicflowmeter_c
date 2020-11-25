@@ -5,11 +5,11 @@
 extern "C" {
 #endif
 
+#include "../packet/queue.h"
+#include "../thread-module/queues.h"
 #include "../utils/affinity.h"
 #include "../utils/atomic.h"
 #include "counters.h"
-#include "packet-queue.h"
-#include "queues.h"
 
 struct _TM_SLOT_T;
 
@@ -73,8 +73,8 @@ typedef struct _TRHEAD_T {
     int id;
 
     /** incoming queue and handler */
-    Tmq *inq;
-    struct Packet_ *(*tmqh_in)(struct _THREAD_T *);
+    TM_QUEUE_T *inq;
+    PACKET_T *(*tmqh_in)(struct _THREAD_VAR_T *);
 
     ATOMIC_DECLARE(uint32_t, flags);
 
@@ -84,21 +84,21 @@ typedef struct _TRHEAD_T {
     /** pointer to the flowworker in the pipeline. Used as starting point
      *  for injected packets. Can be NULL if the flowworker is not part
      *  of this thread. */
-    struct _TM_SLOT_T *tm_flowworker;
+    struct _TM_SLOT_T *tm_flow_worker;
 
     /** outgoing queue and handler */
-    Tmq *outq;
+    TM_QUEUE_T *outq;
     void *outctx;
-    void (*tmqh_out)(struct _THREAD_T *, struct Packet_ *);
+    void (*tmqh_out)(struct _THREAD_T *, PACKET_T *);
 
     /** queue for decoders to temporarily store extra packets they
      *  generate. */
-    PacketQueueNoLock decode_pq;
+    PACKET_QUEUE_NO_LOCK_T decode_pq;
 
     /** Stream packet queue for flow time out injection. Either a pointer to the
      *  workers input queue or to stream_pq_local */
-    struct PacketQueue_ *stream_pq;
-    struct PacketQueue_ *stream_pq_local;
+    PACKET_QUEUE_T *stream_pq;
+    PACKET_QUEUE_T *stream_pq_local;
 
     /* counters */
 
@@ -116,7 +116,7 @@ typedef struct _TRHEAD_T {
     pthread_mutext_t *ctrl_mutex;
     pthread_cond_t *ctrl_cond;
 
-    struct FlowQueue_ *flow_queue;
+    FLOW_QUEUE_T *flow_queue;
 
 } THREAD_T;
 
