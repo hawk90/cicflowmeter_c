@@ -31,11 +31,11 @@ extern "C" {
     0x8903 /* Data center ethernet, \
             * Cisco Fabric Path */
 
-typedef struct EthernetHdr_ {
-    uint8_t eth_dst[6];
-    uint8_t eth_src[6];
+typedef struct _ETHERNET_HDR_T {
+    uint8_t dst[6];
+    uint8_t src[6];
     uint16_t eth_type;
-} __attribute__((__packed__)) EthernetHdr;
+} __attribute__((__packed__)) ETHERNET_HDR_T;
 
 void DecodeEthernetRegisterTests(void);
 

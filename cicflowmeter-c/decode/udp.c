@@ -10,49 +10,49 @@
 #include "util-debug.h"
 #include "util-unittest.h"
 
-static int DecodeUDPPacket(ThreadVars *t, Packet *p, const uint8_t *pkt,
-                           uint16_t len) {
+static int decode_udp_packet(THREAD_T *thread, PACKET_T *pkt,
+                             const uint8_t *raw, uint16_t len) {
     if (unlikely(len < UDP_HEADER_LEN)) {
-        ENGINE_SET_INVALID_EVENT(p, UDP_HLEN_TOO_SMALL);
+        ENGINE_SET_INVALID_EVENT(pkt, UDP_HLEN_TOO_SMALL);
         return -1;
     }
 
-    p->udph = (UDPHdr *)pkt;
+    pkt->udph = (UDP_HDR_T *)raw;
 
-    if (unlikely(len < UDP_GET_LEN(p))) {
-        ENGINE_SET_INVALID_EVENT(p, UDP_PKT_TOO_SMALL);
+    if (unlikely(len < UDP_GET_LEN(pkt))) {
+        ENGINE_SET_INVALID_EVENT(pkt, UDP_PKT_TOO_SMALL);
         return -1;
     }
 
-    if (unlikely(len != UDP_GET_LEN(p))) {
-        ENGINE_SET_INVALID_EVENT(p, UDP_HLEN_INVALID);
+    if (unlikely(len != UDP_GET_LEN(pkt))) {
+        ENGINE_SET_INVALID_EVENT(pkt, UDP_HLEN_INVALID);
         return -1;
     }
 
-    SET_UDP_SRC_PORT(p, &p->sp);
-    SET_UDP_DST_PORT(p, &p->dp);
+    SET_UDP_SRC_PORT(pkt, &p->sport);
+    SET_UDP_DST_PORT(pkt, &p->dport);
 
-    p->payload = (uint8_t *)pkt + UDP_HEADER_LEN;
-    p->payload_len = len - UDP_HEADER_LEN;
+    pkt->payload = (uint8_t *)raw + UDP_HEADER_LEN;
+    pkt->payload_len = len - UDP_HEADER_LEN;
 
-    p->proto = IPPROTO_UDP;
+    pkt->proto = IPPROTO_UDP;
 
     return 0;
 }
 
-int DecodeUDP(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p,
-              const uint8_t *pkt, uint16_t len) {
-    StatsIncr(tv, dtv->counter_udp);
+int decode_udp(THREAD_T *thread, TRHEAD_VARS_T *thread_vars, PACKET_T *pkt,
+               const uint8_t *raw, uint16_t len) {
+    StatsIncr(thread, thread_vars->counter_udp);
 
-    if (unlikely(DecodeUDPPacket(tv, p, pkt, len) < 0)) {
-        CLEAR_UDP_PACKET(p);
+    if (unlikely(decode_udp_packet(thread, pkt, raw, len) < 0)) {
+        CLEAR_UDP_PACKET(pket);
         return TM_ECODE_FAILED;
     }
 
-    SCLogDebug("UDP sp: %" PRIu32 " -> dp: %" PRIu32 " - HLEN: %" PRIu32
-               " LEN: %" PRIu32 "",
-               UDP_GET_SRC_PORT(p), UDP_GET_DST_PORT(p), UDP_HEADER_LEN,
-               p->payload_len);
+    LOG_DBG_MSG("UDP sp: %" PRIu32 " -> dp: %" PRIu32 " - HLEN: %" PRIu32
+                " LEN: %" PRIu32 "",
+                UDP_GET_SRC_PORT(pkt), UDP_GET_DST_PORT(pkt), UDP_HEADER_LEN,
+                pkt->payload_len);
 
     if (DecodeTeredoEnabledForPort(p->sp, p->dp) &&
         likely(DecodeTeredo(tv, dtv, p, p->payload, p->payload_len) ==
@@ -83,7 +83,7 @@ int DecodeUDP(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p,
         return TM_ECODE_OK;
     }
 
-    FlowSetupPacket(p);
+    FlowSetupPacket(pkt);
 
     return TM_ECODE_OK;
 }

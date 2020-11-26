@@ -48,25 +48,25 @@ typedef struct IPV4Opt_ {
 } IPV4Opt;
 
 typedef struct IPV4Hdr_ {
-    uint8_t ip_verhl; /**< version & header length */
-    uint8_t ip_tos;   /**< type of service */
-    uint16_t ip_len;  /**< length */
-    uint16_t ip_id;   /**< id */
-    uint16_t ip_off;  /**< frag offset */
-    uint8_t ip_ttl;   /**< time to live */
-    uint8_t ip_proto; /**< protocol (tcp, udp, etc) */
-    uint16_t ip_csum; /**< checksum */
+    uint8_t verhl; /**< version & header length */
+    uint8_t tos;   /**< type of service */
+    uint16_t len;  /**< length */
+    uint16_t id;   /**< id */
+    uint16_t off;  /**< frag offset */
+    uint8_t ttl;   /**< time to live */
+    uint8_t proto; /**< protocol (tcp, udp, etc) */
+    uint16_t csum; /**< checksum */
     union {
         struct {
-            struct in_addr ip_src; /**< source address */
-            struct in_addr ip_dst; /**< destination address */
+            struct ADDR_T src; /**< source address */
+            struct ADDR_T dst; /**< destination address */
         } ip4_un1;
         uint16_t ip_addrs[4];
     } ip4_hdrun1;
 } IPV4Hdr;
 
-#define s_ip_src ip4_hdrun1.ip4_un1.ip_src
-#define s_ip_dst ip4_hdrun1.ip4_un1.ip_dst
+#define s_ip_src ip4_hdrun1.ip4_un1.src
+#define s_ip_dst ip4_hdrun1.ip4_un1.dst
 #define s_ip_addrs ip4_hdrun1.ip_addrs
 
 #define IPV4_GET_RAW_VER(ip4h) (((ip4h)->ip_verhl & 0xf0) >> 4)
@@ -164,50 +164,50 @@ static inline uint16_t IPV4Checksum(uint16_t *, uint16_t, uint16_t);
  * \retval csum For validation 0 will be returned for success, for calculation
  *    this will be the checksum.
  */
-static inline uint16_t IPV4Checksum(uint16_t *pkt, uint16_t hlen,
-                                    uint16_t init) {
+static inline uint16_t ip_v4_checksum(uint16_t *raw, uint16_t hdr_len,
+                                      uint16_t init) {
     uint32_t csum = init;
 
-    csum += pkt[0] + pkt[1] + pkt[2] + pkt[3] + pkt[4] + pkt[6] + pkt[7] +
-            pkt[8] + pkt[9];
+    csum += raw[0] + raw[1] + raw[2] + raw[3] + raw[4] + raw[6] + raw[7] +
+            raw[8] + raw[9];
 
-    hlen -= 20;
-    pkt += 10;
+    hdr_len -= 20;
+    raw += 10;
 
-    if (hlen == 0) {
+    if (hdr_len == 0) {
         ;
-    } else if (hlen == 4) {
-        csum += pkt[0] + pkt[1];
-    } else if (hlen == 8) {
-        csum += pkt[0] + pkt[1] + pkt[2] + pkt[3];
-    } else if (hlen == 12) {
-        csum += pkt[0] + pkt[1] + pkt[2] + pkt[3] + pkt[4] + pkt[5];
-    } else if (hlen == 16) {
-        csum += pkt[0] + pkt[1] + pkt[2] + pkt[3] + pkt[4] + pkt[5] + pkt[6] +
-                pkt[7];
-    } else if (hlen == 20) {
-        csum += pkt[0] + pkt[1] + pkt[2] + pkt[3] + pkt[4] + pkt[5] + pkt[6] +
-                pkt[7] + pkt[8] + pkt[9];
-    } else if (hlen == 24) {
-        csum += pkt[0] + pkt[1] + pkt[2] + pkt[3] + pkt[4] + pkt[5] + pkt[6] +
-                pkt[7] + pkt[8] + pkt[9] + pkt[10] + pkt[11];
-    } else if (hlen == 28) {
-        csum += pkt[0] + pkt[1] + pkt[2] + pkt[3] + pkt[4] + pkt[5] + pkt[6] +
-                pkt[7] + pkt[8] + pkt[9] + pkt[10] + pkt[11] + pkt[12] +
-                pkt[13];
-    } else if (hlen == 32) {
-        csum += pkt[0] + pkt[1] + pkt[2] + pkt[3] + pkt[4] + pkt[5] + pkt[6] +
-                pkt[7] + pkt[8] + pkt[9] + pkt[10] + pkt[11] + pkt[12] +
-                pkt[13] + pkt[14] + pkt[15];
-    } else if (hlen == 36) {
-        csum += pkt[0] + pkt[1] + pkt[2] + pkt[3] + pkt[4] + pkt[5] + pkt[6] +
-                pkt[7] + pkt[8] + pkt[9] + pkt[10] + pkt[11] + pkt[12] +
-                pkt[13] + pkt[14] + pkt[15] + pkt[16] + pkt[17];
-    } else if (hlen == 40) {
-        csum += pkt[0] + pkt[1] + pkt[2] + pkt[3] + pkt[4] + pkt[5] + pkt[6] +
-                pkt[7] + pkt[8] + pkt[9] + pkt[10] + pkt[11] + pkt[12] +
-                pkt[13] + pkt[14] + pkt[15] + pkt[16] + pkt[17] + pkt[18] +
-                pkt[19];
+    } else if (hdr_len == 4) {
+        csum += raw[0] + raw[1];
+    } else if (hdr_len == 8) {
+        csum += raw[0] + raw[1] + raw[2] + raw[3];
+    } else if (hdr_len == 12) {
+        csum += raw[0] + raw[1] + raw[2] + raw[3] + raw[4] + raw[5];
+    } else if (hdr_len == 16) {
+        csum += raw[0] + raw[1] + raw[2] + raw[3] + raw[4] + raw[5] + raw[6] +
+                raw[7];
+    } else if (hdr_len == 20) {
+        csum += raw[0] + raw[1] + raw[2] + raw[3] + raw[4] + raw[5] + raw[6] +
+                raw[7] + raw[8] + raw[9];
+    } else if (hdr_len == 24) {
+        csum += raw[0] + raw[1] + raw[2] + raw[3] + raw[4] + raw[5] + raw[6] +
+                raw[7] + raw[8] + raw[9] + raw[10] + raw[11];
+    } else if (hdr_len == 28) {
+        csum += raw[0] + raw[1] + raw[2] + raw[3] + raw[4] + raw[5] + raw[6] +
+                raw[7] + raw[8] + raw[9] + raw[10] + raw[11] + raw[12] +
+                raw[13];
+    } else if (hdr_len == 32) {
+        csum += raw[0] + raw[1] + raw[2] + raw[3] + raw[4] + raw[5] + raw[6] +
+                raw[7] + raw[8] + raw[9] + raw[10] + raw[11] + raw[12] +
+                raw[13] + raw[14] + raw[15];
+    } else if (hdr_len == 36) {
+        csum += raw[0] + raw[1] + raw[2] + raw[3] + raw[4] + raw[5] + raw[6] +
+                raw[7] + raw[8] + raw[9] + raw[10] + raw[11] + raw[12] +
+                raw[13] + raw[14] + raw[15] + raw[16] + raw[17];
+    } else if (hdr_len == 40) {
+        csum += raw[0] + raw[1] + raw[2] + raw[3] + raw[4] + raw[5] + raw[6] +
+                raw[7] + raw[8] + raw[9] + raw[10] + raw[11] + raw[12] +
+                raw[13] + raw[14] + raw[15] + raw[16] + raw[17] + raw[18] +
+                raw[19];
     }
 
     csum = (csum >> 16) + (csum & 0x0000FFFF);
