@@ -3,200 +3,187 @@
 #include "util-memcmp.h"
 #include "util-unittest.h"
 
-HashTable *HashTableInit(
-    uint32_t size, uint32_t (*Hash)(struct HashTable_ *, void *, uint16_t),
-    char (*Compare)(void *, uint16_t, void *, uint16_t), void (*Free)(void *)) {
-    HashTable *ht = NULL;
+HASH_TABLE_T *init_hash_table(
+    uint32_t size, uint32_t (*hash)(struct _HASH_TABLE_T *, void *, uint16_t),
+    char (*compare)(void *, uint16_t, void *, uint16_t), void (*free)(void *)) {
+    HASH_TABLE_T *hash_table = NULL;
 
     if (size == 0) {
         goto error;
     }
 
-    if (Hash == NULL) {
-        // printf("ERROR: HashTableInit no Hash function\n");
+    if (hash == NULL) {
         goto error;
     }
 
-    /* setup the filter */
-    ht = SCMalloc(sizeof(HashTable));
+    hash_table = malloc(sizeof(HASH_TABLE_T));
     if (unlikely(ht == NULL)) goto error;
-    memset(ht, 0, sizeof(HashTable));
-    ht->array_size = size;
-    ht->Hash = Hash;
-    ht->Free = Free;
+    memset(ht, 0, sizeof(HASH_TABLE_T));
+    hash_table->size = size;
+    hash_table->hash = hash_func;
+    hash_table->free = free_func;
 
-    if (Compare != NULL)
-        ht->Compare = Compare;
+    if (compare != NULL)
+        hash_table->compare = compare_func;
     else
-        ht->Compare = HashTableDefaultCompare;
+        hash_table->compare = compare_hash_table;
 
-    /* setup the bitarray */
-    ht->array = SCMalloc(ht->array_size * sizeof(HashTableBucket *));
-    if (ht->array == NULL) goto error;
-    memset(ht->array, 0, ht->array_size * sizeof(HashTableBucket *));
+    hash_table->array =
+        malloc(hash_table->array_size * sizeof(HASH_TABLE_BUCKET_T *));
+    if (hash_table->array == NULL) goto error;
+    memset(hash_table->array, 0,
+           hash_table->array_size * sizeof(HASH_TABLE_BUCKET_T *));
 
-    return ht;
+    return hash_table;
 
 error:
-    if (ht != NULL) {
-        if (ht->array != NULL) SCFree(ht->array);
+    if (hash_table != NULL) {
+        if (hash_table->array != NULL) free(hash_table->array);
 
-        SCFree(ht);
+        free(hash_table);
     }
     return NULL;
 }
 
-void HashTableFree(HashTable *ht) {
+void free_hash_table(HASH_TABLE_T *hash_table) {
     uint32_t i = 0;
 
-    if (ht == NULL) return;
+    if (hash_table == NULL) return;
 
-    /* free the buckets */
-    for (i = 0; i < ht->array_size; i++) {
-        HashTableBucket *hashbucket = ht->array[i];
-        while (hashbucket != NULL) {
-            HashTableBucket *next_hashbucket = hashbucket->next;
-            if (ht->Free != NULL) ht->Free(hashbucket->data);
-            SCFree(hashbucket);
-            hashbucket = next_hashbucket;
+    for (i = 0; i < hash_table->size; i++) {
+        HASH_TABLE_BUCKET_T *bucket = hash_table->array[i];
+        while (bucket != NULL) {
+            HASH_TABLE_BUCKET_T *next = bucket->next;
+            if (hash_table->free != NULL) hash_table->free(bucket->data);
+            free(bucket);
+            bucket = next;
         }
     }
 
-    /* free the arrray */
-    if (ht->array != NULL) SCFree(ht->array);
+    if (hash_table->array != NULL) free(hash_table->array);
 
-    SCFree(ht);
+    free(hash_table);
 }
 
-void HashTablePrint(HashTable *ht) {
-    printf("\n----------- Hash Table Stats ------------\n");
-    printf("Buckets:               %" PRIu32 "\n", ht->array_size);
-    printf("Hash function pointer: %p\n", ht->Hash);
-    printf("-----------------------------------------\n");
-}
+int add_hash_table(HASH_TABLE_T *hash_table, void *data, uint16_t len) {
+    if (hash_table == NULL || data == NULL) goto error;
 
-int HashTableAdd(HashTable *ht, void *data, uint16_t datalen) {
-    if (ht == NULL || data == NULL) return -1;
+    uint32_t hash = hash_table->hash(hash_table, data, len);
 
-    uint32_t hash = ht->Hash(ht, data, datalen);
+    HASH_TABLE_BUCKET_T *bucket = malloc(sizeof(HASH_TABLE_BUCKET_T));
+    if (unlikely(bucket == NULL)) goto error;
+    memset(bucket, 0, sizeof(HASH_TABLE_BUCKET_T));
+    bucket->data = data;
+    bucket->size = len;
+    bucket->next = NULL;
 
-    HashTableBucket *hb = SCMalloc(sizeof(HashTableBucket));
-    if (unlikely(hb == NULL)) goto error;
-    memset(hb, 0, sizeof(HashTableBucket));
-    hb->data = data;
-    hb->size = datalen;
-    hb->next = NULL;
-
-    if (hash >= ht->array_size) {
-        SCLogWarning(SC_ERR_INVALID_VALUE,
+    if (hash >= hash_table->size) {
+        LOG_WARN_MSG(SC_ERR_INVALID_VALUE,
                      "attempt to insert element out of hash array\n");
         goto error;
     }
 
-    if (ht->array[hash] == NULL) {
-        ht->array[hash] = hb;
+    if (hash_table->array[hash] == NULL) {
+        hash_table->array[hash] = bucket;
     } else {
-        hb->next = ht->array[hash];
-        ht->array[hash] = hb;
+        bucket->next = hash_table->array[hash];
+        hash_table->array[hash] = bucket;
     }
-
-#ifdef UNITTESTS
-    ht->count++;
-#endif
 
     return 0;
 
 error:
-    if (hb != NULL) SCFree(hb);
+    if (bucket != NULL) free(bucket);
     return -1;
 }
 
-int HashTableRemove(HashTable *ht, void *data, uint16_t datalen) {
-    uint32_t hash = ht->Hash(ht, data, datalen);
+int remove_hash_table(HASH_TABLE_T *hash_table, void *data, uint16_t len) {
+    uint32_t hash = ht->hash(hash_table, data, len);
 
-    if (ht->array[hash] == NULL) {
-        return -1;
-    }
+    if (hash_table->array[hash] == NULL) return -1;
 
-    if (ht->array[hash]->next == NULL) {
-        if (ht->Free != NULL) ht->Free(ht->array[hash]->data);
-        SCFree(ht->array[hash]);
-        ht->array[hash] = NULL;
+    if (hash_table->array[hash]->next == NULL) {
+        if (hash_table->free != NULL)
+            hash_table->free(hash_table->array[hash]->data);
+        free(hash_table->array[hash]);
+        hash_table->array[hash] = NULL;
         return 0;
     }
 
-    HashTableBucket *hashbucket = ht->array[hash], *prev_hashbucket = NULL;
+    HASH_TABLE_BUCKET_T *bucket = hash_table->array[hash], *prev = NULL;
     do {
-        if (ht->Compare(hashbucket->data, hashbucket->size, data, datalen) ==
-            1) {
-            if (prev_hashbucket == NULL) {
+        if (hash_table->compare(bucket->data, bucket->size, data, len) == 1) {
+            if (prev == NULL) {
                 /* root bucket */
-                ht->array[hash] = hashbucket->next;
+                hash_table->array[hash] = bucket->next;
             } else {
                 /* child bucket */
-                prev_hashbucket->next = hashbucket->next;
+                prev->next = bucket->next;
             }
 
             /* remove this */
-            if (ht->Free != NULL) ht->Free(hashbucket->data);
-            SCFree(hashbucket);
+            if (ht->free != NULL) hash_table->free(bucket->data);
+            free(bucket);
             return 0;
         }
 
-        prev_hashbucket = hashbucket;
-        hashbucket = hashbucket->next;
-    } while (hashbucket != NULL);
+        prev = bucket;
+        bucket = bucket->next;
+    } while (bucket != NULL);
 
     return -1;
 }
 
-void *HashTableLookup(HashTable *ht, void *data, uint16_t datalen) {
+void *lookup_hash_table(HASH_TABLE_T *hash_table, void *data, uint16_t len) {
     uint32_t hash = 0;
 
-    if (ht == NULL) return NULL;
+    if (hash_table == NULL) return NULL;
 
-    hash = ht->Hash(ht, data, datalen);
+    hash = hash_table->hash(ht, data, len);
 
-    if (hash >= ht->array_size) {
-        SCLogWarning(SC_ERR_INVALID_VALUE,
+    if (hash >= hash_table->size) {
+        LOG_WARN_MSG(SC_ERR_INVALID_VALUE,
                      "attempt to access element out of hash array\n");
-        return NULL;
+        goto error;
     }
 
-    if (ht->array[hash] == NULL) return NULL;
+    if (hash_table->array[hash] == NULL) goto error;
 
-    HashTableBucket *hashbucket = ht->array[hash];
+    HASH_TABLE_BUCKET_T *bucket = hash_table->array[hash];
     do {
-        if (ht->Compare(hashbucket->data, hashbucket->size, data, datalen) == 1)
-            return hashbucket->data;
+        if (hash_table->compare(bucket->data, bucket->size, data, len) == 1)
+            return bucket->data;
 
-        hashbucket = hashbucket->next;
-    } while (hashbucket != NULL);
+        bucket = bucket->next;
+    } while (bucket != NULL);
+
+error:
 
     return NULL;
 }
 
-uint32_t HashTableGenericHash(HashTable *ht, void *data, uint16_t datalen) {
+uint32_t generic_hash_table(HASH_TABLE_T *hash_table, void *data,
+                            uint16_t data) {
     uint8_t *d = (uint8_t *)data;
     uint32_t i;
     uint32_t hash = 0;
 
-    for (i = 0; i < datalen; i++) {
+    for (i = 0; i < len; i++) {
         if (i == 0)
             hash += (((uint32_t)*d++));
         else if (i == 1)
-            hash += (((uint32_t)*d++) * datalen);
+            hash += (((uint32_t)*d++) * len);
         else
-            hash *= (((uint32_t)*d++) * i) + datalen + i;
+            hash *= (((uint32_t)*d++) * i) + len + i;
     }
 
-    hash *= datalen;
-    hash %= ht->array_size;
+    hash *= len;
+    hash %= hash_table->size;
     return hash;
 }
 
-char HashTableDefaultCompare(void *data1, uint16_t len1, void *data2,
-                             uint16_t len2) {
+char compare_hash_table(void *data1, uint16_t len1, void *data2,
+                        uint16_t len2) {
     if (len1 != len2) return 0;
 
     if (memcmp(data1, data2, len1) != 0) return 0;
