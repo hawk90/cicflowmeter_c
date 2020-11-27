@@ -28,15 +28,12 @@
 extern "C" {
 #endif
 
-// int recalculate_checksum(Packet *p);
-int check_checksum_automode(uint64_t thread_count, uint64_t iface_count,
-                            uint64_t iface_fail);
-
-/* constant linked with detection of interface with
- * invalid checksums */
 #define CHECKSUM_SAMPLE_COUNT 1000ULL
 #define CHECKSUM_INVALID_RATIO 10
 
+int recalculate_checksum(PACKET_T *pkt);
+int check_checksum_automode(uint64_t thread_count, uint64_t iface_count,
+                            uint64_t iface_fail);
 #ifdef __cplusplus
 }
 #endif

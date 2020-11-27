@@ -15,31 +15,29 @@
  * 02110-1301, USA.
  */
 
-#include "../common/cicflowmeter_common.h"
-
 #include "checksum.h"
+
+#include "../common/cicflowmeter_common.h"
+#include "../decode/decode.h"
 #include "debug.h"
 
-#include "../decode/decode.h"
-
-int recalculate_checksum(PACKET_T *p) {
-    if (IS_IPV4(p)) {
-        if (IS_TCP(p)) {
+int recalculate_checksum(PACKET_T *pkt) {
+    if (IS_IPV4(pkt)) {
+        if (IS_TCP(pkt)) {
             // TCP
-            p->tcph->th_sum = 0;
-            p->tcph->th_sum =
-                TCPChecksum(p->ip4h->s_ip_addrs, (uint16_t *)p->tcph,
-                            (p->payload_len + TCP_GET_HLEN(p)), 0);
-        } else if (IS_UDP(p)) {
-            p->udph->uh_sum = 0;
-            p->udph->uh_sum =
-                UDPV4Checksum(p->ip4h->s_ip_addrs, (uint16_t *)p->udph,
-                              (p->payload_len + UDP_HEADER_LEN), 0);
+            pkt->tcp_hdr->th_sum = 0;
+            pkt->tcp_hdr->th_sum =
+                tcp_checksum(pkt->ip4_hdr->s_ip_addrs, (uint16_t *)pkt->tcp_hdr,
+                             (pkt->payload_len + GET_TCP_HLEN(pkt)), 0);
+        } else if (IS_UDP(pkt)) {
+            pkt->udp_hdr->uh_sum = 0;
+            pkt->udp_hdr->uh_sum =
+                udpv4_checksum(p->ip4h->s_ip_addrs, (uint16_t *)pkt->udp_hdr,
+                               (pkt->payload_len + UDP_HEADER_LEN), 0);
         }
-        // IPV4
-        p->ip4h->ip_csum = 0;
-        p->ip4h->ip_csum =
-            IPV4Checksum((uint16_t *)p->ip4h, IPV4_GET_RAW_HLEN(p->ip4h), 0);
+        pkt->ip4_hdr->ip_csum = 0;
+        pkt->ip4_hdr->ip_csum = ipv4_checksum((uint16_t *)pkt->ip4_hdr,
+                                              IPV4_GET_RAW_HLEN(pkt->ip4h), 0);
     }
 
     return 0;
