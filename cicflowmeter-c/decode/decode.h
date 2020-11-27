@@ -161,7 +161,7 @@ typedef struct ADDR_T_ {
     } while (0)
 
 /* Port is just a uint16_t */
-typedef uint16_t Port;
+typedef uint16_t PORT_T;
 #define SET_PORT(v, p) ((p) = (v))
 #define COPY_PORT(a, b) ((b) = (a))
 
@@ -340,20 +340,20 @@ typedef struct _PACKET_T {
     ADDR_T src;
     ADDR_T dst;
     union {
-        PORT sport;
+        PORT_T sport;
         // icmp type and code of this packet
         struct {
             uint8_t type;
             uint8_t code;
-        } icmp_s;
+        } icmp_src;
     };
     union {
-        PORT dport;
+        PORT_T dport;
         // icmp type and code of the expected counterpart (for flows)
         struct {
             uint8_t type;
             uint8_t code;
-        } icmp_d;
+        } icmp_dst;
     };
     uint8_t proto;
     /* make sure we can't be attacked on when the tunneled packet
@@ -367,7 +367,7 @@ typedef struct _PACKET_T {
     /* Pkt Flags */
     uint32_t flags;
 
-    struct FLOW_ *flow;
+    struct FLOW_T *flow;
 
     /* raw hash value for looking up the flow, will need to modulated to the
      * hash size still */
@@ -377,7 +377,7 @@ typedef struct _PACKET_T {
 
     union {
         /** libpcap vars: shared by Pcap Live mode and Pcap File mode */
-        PcapPacketVars pcap_v;
+        PCAPT_T pcap;
     };
 
     /** The release function for packet structure and data */
@@ -390,14 +390,14 @@ typedef struct _PACKET_T {
     PACKET_VAR_T *pkt_var;
 
     /* header pointers */
-    EthernetHdr *eth_hdr;
+    ETHERNET_HDR_T *eth_hdr;
 
     /* Checksum for IP packets. */
     int32_t level3_comp_csum;
     /* Check sum for TCP, UDP or ICMP packets */
     int32_t level4_comp_csum;
 
-    IPV4Hdr *ip4h;
+    IPV4_HDR_T *ip4_hdr;
 
     /* IPv4 and IPv6 are mutually exclusive */
     union {
@@ -406,18 +406,17 @@ typedef struct _PACKET_T {
     /* Can only be one of TCP, UDP, ICMP at any given time */
     union {
         TCPVars tcp_vars;
-        ICMPV4Vars icmpv4vars;
-    } l4vars;
+        ICMPV4Vars icmpv4_vars;
+    } l4_vars;
 
-#define tcpvars l4vars.tcpvars
-#define icmpv4vars l4vars.icmpv4vars
-#define icmpv6vars l4vars.icmpv6vars
+#define tcp_vars l4vars.tcp_vars
+#define icmpv4_vars l4vars.icmpv4_vars
 
     TCP_HDR_T *tcp_hdr;
 
-    UDPHdr *udph;
+    UDP_HDR_T *udp_hdr;
 
-    ICMPV4Hdr *icmpv4h;
+    ICMPV4_HDR_T *icmpv4_hdr;
 
     /* ptr to the payload of the packet
      * with it's length. */
@@ -560,33 +559,34 @@ typedef struct _THREAD_VARS_T {
 
 } THREAD_VARS_T;
 
-typedef struct CaptureStats_ {
-    uint16_t counter_ips_accepted;
-    uint16_t counter_ips_blocked;
-    uint16_t counter_ips_rejected;
-    uint16_t counter_ips_replaced;
+typedef struct _CAPTURE_STATS_T {
+    uint16_t cnt_accepted;
+    uint16_t cnt_blocked;
+    uint16_t cnt_rejected;
+    uint16_t cnt_replaced;
 
-} CaptureStats;
+} CAPTURE_STATS_T;
 
-void CaptureStatsUpdate(THREAD_T *thread, CaptureStats *s, const PACKET_T *pkt);
-void CaptureStatsSetup(THREAD_T *thread, CaptureStats *s);
+void update_capture_stats(THREAD_T *thread, CAPTURE_STATS_T *stats,
+                          const PACKET_T *pkt);
+void setup_capture_stats(THREAD_T *thread, CAPTURE_STATS_T *stats);
 
-#define PACKET_CLEAR_L4VARS(p)                           \
-    do {                                                 \
-        memset(&(p)->l4vars, 0x00, sizeof((p)->l4vars)); \
+#define CLEAR_L4_VARS(p)                                   \
+    do {                                                   \
+        memset(&(p)->l4_vars, 0x00, sizeof((p)->l4_vars)); \
     } while (0)
 
 /**
  *  \brief reset these to -1(indicates that the packet is fresh from the queue)
  */
-#define PACKET_RESET_CHECKSUMS(p)   \
+#define RESET_CHECKSUMS(p)          \
     do {                            \
         (p)->level3_comp_csum = -1; \
         (p)->level4_comp_csum = -1; \
     } while (0)
 
 /* if p uses extended data, free them */
-#define PACKET_FREE_EXTDATA(p)                   \
+#define FREE_EXTDATA(p)                          \
     do {                                         \
         if ((p)->ext_pkt) {                      \
             if (!((p)->flags & PKT_ZERO_COPY)) { \
@@ -599,14 +599,14 @@ void CaptureStatsSetup(THREAD_T *thread, CaptureStats *s);
 /**
  *  \brief Initialize a packet structure for use.
  */
-#define PACKET_INITIALIZE(p)                   \
+#define INITIALIZE(p)                          \
     {                                          \
         SCMutexInit(&(p)->tunnel_mutex, NULL); \
         PACKET_RESET_CHECKSUMS((p));           \
         (p)->livedev = NULL;                   \
     }
 
-#define PACKET_RELEASE_REFS(p)             \
+#define RELEASE_REFS(p)                    \
     do {                                   \
         FlowDeReference(&((p)->flow));     \
         HostDeReference(&((p)->host_src)); \
@@ -616,17 +616,17 @@ void CaptureStatsSetup(THREAD_T *thread, CaptureStats *s);
 /**
  *  \brief Recycle a packet structure for reuse.
  */
-#define PACKET_REINIT(p)                                         \
+#define REINIT(p)                                                \
     do {                                                         \
         CLEAR_ADDR(&(p)->src);                                   \
         CLEAR_ADDR(&(p)->dst);                                   \
-        (p)->sp = 0;                                             \
-        (p)->dp = 0;                                             \
+        (p)->sport = 0;                                          \
+        (p)->dport = 0;                                          \
         (p)->proto = 0;                                          \
         (p)->recursion_level = 0;                                \
         PACKET_FREE_EXTDATA((p));                                \
         (p)->flags = (p)->flags & PKT_ALLOC;                     \
-        (p)->flowflags = 0;                                      \
+        (p)->flow_flags = 0;                                     \
         (p)->pkt_src = 0;                                        \
         (p)->vlan_id[0] = 0;                                     \
         (p)->vlan_id[1] = 0;                                     \
@@ -639,23 +639,23 @@ void CaptureStatsSetup(THREAD_T *thread, CaptureStats *s);
             PktVarFree((p)->pktvar);                             \
             (p)->pktvar = NULL;                                  \
         }                                                        \
-        (p)->ethh = NULL;                                        \
-        if ((p)->ip4h != NULL) {                                 \
+        (p)->eth_hdr = NULL;                                     \
+        if ((p)->ip4_hdr != NULL) {                              \
             CLEAR_IPV4_PACKET((p));                              \
         }                                                        \
         if ((p)->ip6h != NULL) {                                 \
             CLEAR_IPV6_PACKET((p));                              \
         }                                                        \
-        if ((p)->tcph != NULL) {                                 \
+        if ((p)->tcp_hdr != NULL) {                              \
             CLEAR_TCP_PACKET((p));                               \
         }                                                        \
-        if ((p)->udph != NULL) {                                 \
+        if ((p)->udp_hdr != NULL) {                              \
             CLEAR_UDP_PACKET((p));                               \
         }                                                        \
         if ((p)->sctph != NULL) {                                \
             CLEAR_SCTP_PACKET((p));                              \
         }                                                        \
-        if ((p)->icmpv4h != NULL) {                              \
+        if ((p)->icmpv4_hdr != NULL) {                           \
             CLEAR_ICMPV4_PACKET((p));                            \
         }                                                        \
         if ((p)->icmpv6h != NULL) {                              \
@@ -668,7 +668,7 @@ void CaptureStatsSetup(THREAD_T *thread, CaptureStats *s);
         (p)->payload = NULL;                                     \
         (p)->payload_len = 0;                                    \
         (p)->BypassPacketsFlow = NULL;                           \
-        (p)->pktlen = 0;                                         \
+        (p)->pkt_len = 0;                                        \
         (p)->alerts.cnt = 0;                                     \
         (p)->alerts.drop.action = 0;                             \
         (p)->pcap_cnt = 0;                                       \
@@ -685,16 +685,16 @@ void CaptureStatsSetup(THREAD_T *thread, CaptureStats *s);
         p->tenant_id = 0;                                        \
     } while (0)
 
-#define PACKET_RECYCLE(p)         \
-    do {                          \
-        PACKET_RELEASE_REFS((p)); \
-        PACKET_REINIT((p));       \
+#define RECYCLE(p)         \
+    do {                   \
+        RELEASE_REFS((p)); \
+        REINIT((p));       \
     } while (0)
 
 /**
  *  \brief Cleanup a packet so that we can free it. No memset needed..
  */
-#define PACKET_DESTRUCTOR(p)                                     \
+#define DESTRUCTOR(p)                                            \
     do {                                                         \
         if ((p)->pktvar != NULL) {                               \
             PktVarFree((p)->pktvar);                             \
@@ -709,31 +709,29 @@ void CaptureStatsSetup(THREAD_T *thread, CaptureStats *s);
  * handle the case of a root packet
  * for tunnels */
 
-#define PACKET_SET_ACTION(p, a)                                    \
+#define SET_ACTION(p, a)                                           \
     do {                                                           \
         ((p)->root ? ((p)->root->action = a) : ((p)->action = a)); \
     } while (0)
 
-#define PACKET_ALERT(p) PACKET_SET_ACTION(p, ACTION_ALERT)
+#define ALERT(p) SET_ACTION(p, ACTION_ALERT)
 
-#define PACKET_ACCEPT(p) PACKET_SET_ACTION(p, ACTION_ACCEPT)
+#define ACCEPT(p) SET_ACTION(p, ACTION_ACCEPT)
 
-#define PACKET_DROP(p) PACKET_SET_ACTION(p, ACTION_DROP)
+#define DROP(p) SET_ACTION(p, ACTION_DROP)
 
-#define PACKET_REJECT(p) PACKET_SET_ACTION(p, (ACTION_REJECT | ACTION_DROP))
+#define REJECT(p) SET_ACTION(p, (ACTION_REJECT | ACTION_DROP))
 
-#define PACKET_REJECT_DST(p) \
-    PACKET_SET_ACTION(p, (ACTION_REJECT_DST | ACTION_DROP))
+#define REJECT_DST(p) SET_ACTION(p, (ACTION_REJECT_DST | ACTION_DROP))
 
-#define PACKET_REJECT_BOTH(p) \
-    PACKET_SET_ACTION(p, (ACTION_REJECT_BOTH | ACTION_DROP))
+#define REJECT_BOTH(p) SET_ACTION(p, (ACTION_REJECT_BOTH | ACTION_DROP))
 
-#define PACKET_PASS(p) PACKET_SET_ACTION(p, ACTION_PASS)
+#define PASS(p) SET_ACTION(p, ACTION_PASS)
 
-#define PACKET_TEST_ACTION(p, a) \
+#define TEST_ACTION(p, a) \
     ((p)->root ? ((p)->root->action & a) : ((p)->action & a))
 
-#define PACKET_UPDATE_ACTION(p, a)                                   \
+#define UPDATE_ACTION(p, a)                                          \
     do {                                                             \
         ((p)->root ? ((p)->root->action |= a) : ((p)->action |= a)); \
     } while (0)
@@ -772,28 +770,27 @@ PACKET_T *PacketDefragPktSetup(PACKET_T *parent, const uint8_t *raw,
                                uint32_t len, uint8_t proto);
 void PacketDefragPktSetupParent(PACKET_T *parent);
 void DecodeRegisterPerfCounters(THREAD_VARS_T *, THREAD_T *);
-PACKET_T *PacketGetFromQueueOrAlloc(void);
-PACKET_T *PacketGetFromAlloc(void);
+PACKET_T *get_from_queue_or_alloc(void);
+PACKET_T *get_from_alloc(void);
 void PacketDecodeFinalize(THREAD_T *thread, THREAD_VARS_T *thread_vars,
                           PACKET_T *pkt);
 void PacketUpdateEngineEventCounters(THREAD_T *thread,
                                      THREAD_VARS_T *thread_vars, PACKET_T *pkt);
 void free_packet(PACKET_T *pkt);
-void PacketFreeOrRelease(PACKET_T *pkt);
-int PacketCallocExtPkt(PACKET_T *pkt, int datalen);
-int PacketCopyData(PACKET_T *pkt, const uint8_t *raw, uint32_t pktlen);
-int PacketSetData(PACKET_T *pkt, const uint8_t *raw, uint32_t pktlen);
-int PacketCopyDataOffset(PACKET_T *pkt, uint32_t offset, const uint8_t *raw,
-                         uint32_t datalen);
-const char *PktSrcToString(enum PktSrcEnum pkt_src);
-void PacketBypassCallback(PACKET_T *pkt);
-void PacketSwap(PACKET_T *pkt);
+void free_or_release(PACKET_T *pkt);
+int calloc_extpkt(PACKET_T *pkt, int datalen);
+int copy_data(PACKET_T *pkt, const uint8_t *raw, uint32_t pktlen);
+int set_data(PACKET_T *pkt, const uint8_t *raw, uint32_t pktlen);
+int copy_data_offset(PACKET_T *pkt, uint32_t offset, const uint8_t *raw,
+                     uint32_t datalen);
+const char *src_to_string(enum PKTSRCENUM pkt_src);
+void callback_bypass(PACKET_T *pkt);
+void swap_packet(PACKET_T *pkt);
 
 THREAD_VARS_T *alloc_thread_vars(THREAD_T *);
-void DecodeThreadVarsFree(THREAD_T *, THREAD_VARS_T *);
-void DecodeUpdatePacketCounters(THREAD_T *thread,
-                                const THREAD_VARS_T *thread_vars,
-                                const PACKET_T *pkt);
+void free_thread_vars(THREAD_T *, THREAD_VARS_T *);
+void update_packet_counters(THREAD_T *thread, const THREAD_VARS_T *thread_vars,
+                            const PACKET_T *pkt);
 
 /* decoder functions */
 int decode_ethernet(THREAD_T *, THREAD_VARS_T *, PACKET_T *, const uint8_t *,
@@ -972,16 +969,16 @@ void DecodeUnregisterCounters(void);
 #define PKT_TUNNEL (1 << 13)
 #define PKT_TUNNEL_VERDICTED (1 << 14)
 
-#define PKT_IGNORE_CHECKSUM \
+#define IGNORE_CHECKSUM \
     (1 << 15) /**< Packet checksum is not computed (TX packet for example) */
-#define PKT_ZERO_COPY \
+#define ZERO_COPY \
     (1 << 16) /**< Packet comes from zero copy (ext_pkt must not be freed) */
 
 #define PKT_HOST_SRC_LOOKED_UP (1 << 17)
 #define PKT_HOST_DST_LOOKED_UP (1 << 18)
 
-#define PKT_IS_FRAGMENT (1 << 19) /**< Packet is a fragment */
-#define PKT_IS_INVALID (1 << 20)
+#define IS_FRAGMENT (1 << 19) /**< Packet is a fragment */
+#define IS_INVALID (1 << 20)
 #define PKT_PROFILE (1 << 21)
 
 /** indication by decoder that it feels the packet should be handled by
@@ -1009,7 +1006,7 @@ void DecodeUnregisterCounters(void);
 #define PKT_IS_PSEUDOPKT(p) \
     ((p)->flags & (PKT_PSEUDO_STREAM_END | PKT_PSEUDO_DETECTLOG_FLUSH))
 
-#define PKT_SET_SRC(p, src_val) ((p)->pkt_src = src_val)
+#define SET_SRC(p, src_val) ((p)->pkt_src = src_val)
 
 /** \brief return true if *this* packet needs to trigger a verdict.
  *

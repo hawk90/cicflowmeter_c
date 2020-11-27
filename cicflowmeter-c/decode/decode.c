@@ -1,22 +1,20 @@
+#include "../common/cicflowmeter_common.h"
+
 #include "decode.h"
-#include "app-layer-detect-proto.h"
-#include "app-layer.h"
+
+#include "../util/debug.h"
+#include "../util/error.h"
+#include "../util/print.h"
 #include "conf.h"
-#include "decode-teredo.h"
 #include "flow-storage.h"
 #include "output-flow.h"
 #include "output.h"
 #include "pkt-var.h"
-#include "suricata-common.h"
-#include "suricata.h"
 #include "tm-threads.h"
 #include "tmqh-packetpool.h"
-#include "util-debug.h"
-#include "util-error.h"
 #include "util-hash-string.h"
 #include "util-mem.h"
 #include "util-mpm-ac.h"
-#include "util-print.h"
 #include "util-profiling.h"
 
 uint32_t default_packet_size = 0;
@@ -46,7 +44,7 @@ int decode_tunnel(THREAD_T *thread, THREAD_VARS_T *thread_vars, PACKET_T *pkt,
  */
 void free_packet(PACKET_T *pkt) {
     PACKET_DESTRUCTOR(pkt);
-    SCFree(pkt);
+    free(pkt);
 }
 
 /**
@@ -56,9 +54,10 @@ void free_packet(PACKET_T *pkt) {
  * functions when decoding has been successful.
  *
  */
-void PacketDecodeFinalize(ThreadVars *tv, DecodeThreadVars *dtv, Packet *p) {
-    if (p->flags & PKT_IS_INVALID) {
-        StatsIncr(tv, dtv->counter_invalid);
+void finalize_decode(TRHEAD_T *thread, THREAD_VARS_T *thread_vars,
+                     PACKET_T *pkt) {
+    if (pkt->flags & PKT_IS_INVALID) {
+        StatsIncr(thread, thread_vars->counter_invalid);
     }
 }
 
@@ -80,31 +79,31 @@ void PacketUpdateEngineEventCounters(ThreadVars *tv, DecodeThreadVars *dtv,
  *
  * \retval p packet, NULL on error
  */
-Packet *PacketGetFromAlloc(void) {
-    Packet *p = SCMalloc(SIZE_OF_PACKET);
-    if (unlikely(p == NULL)) {
+PACKET_T *get_from_alloc(void) {
+    PACKET *p = malloc(SIZE_OF_PACKET);
+    if (unlikely(pkt == NULL)) {
         return NULL;
     }
 
-    memset(p, 0, SIZE_OF_PACKET);
-    PACKET_INITIALIZE(p);
-    p->ReleasePacket = PacketFree;
-    p->flags |= PKT_ALLOC;
+    memset(pkt, 0, SIZE_OF_PACKET);
+    PACKET_INITIALIZE(pkt);
+    pkt->ReleasePacket = PacketFree;
+    pkt->flags |= PKT_ALLOC;
 
-    SCLogDebug("allocated a new packet only using alloc...");
+    LOG_DBG_MSG("allocated a new packet only using alloc...");
 
-    PACKET_PROFILING_START(p);
-    return p;
+    PACKET_PROFILING_START(pkt);
+    return pkt;
 }
 
 /**
  * \brief Return a packet to where it was allocated.
  */
-void PacketFreeOrRelease(Packet *p) {
-    if (p->flags & PKT_ALLOC)
-        PacketFree(p);
+void free_or_release(PACKET_T *pkt) {
+    if (pkt->flags & PKT_ALLOC)
+        PacketFree(pkt);
     else
-        PacketPoolReturnPacket(p);
+        PacketPoolReturnPacket(pkt);
 }
 
 /**
@@ -114,13 +113,13 @@ void PacketFreeOrRelease(Packet *p) {
  *
  *  \retval p packet, NULL on error
  */
-Packet *PacketGetFromQueueOrAlloc(void) {
+PACKET_T *get_from_queue_or_alloc(void) {
     /* try the pool first */
-    Packet *p = PacketPoolGetPacket();
+    PACKET_T *pkt = PacketPoolGetPacket();
 
     if (p == NULL) {
         /* non fatal, we're just not processing a packet then */
-        p = PacketGetFromAlloc();
+        p = get_from_alloc();
     } else {
         PACKET_PROFILING_START(p);
     }
@@ -128,11 +127,11 @@ Packet *PacketGetFromQueueOrAlloc(void) {
     return p;
 }
 
-inline int PacketCallocExtPkt(Packet *p, int datalen) {
-    if (!p->ext_pkt) {
-        p->ext_pkt = SCCalloc(1, datalen);
-        if (unlikely(p->ext_pkt == NULL)) {
-            SET_PKT_LEN(p, 0);
+inline int calloc_ext_pkt(PACKET_T *pkt, int len) {
+    if (!pkt->ext_pkt) {
+        pkt->ext_pkt = calloc(1, datalen);
+        if (unlikely(pkt->ext_pkt == NULL)) {
+            SET_PKT_LEN(pkt, 0);
             return -1;
         }
     }
@@ -153,36 +152,36 @@ inline int PacketCallocExtPkt(Packet *p, int datalen) {
  *  \param Pointer to the data to copy
  *  \param Length of the data to copy
  */
-inline int PacketCopyDataOffset(Packet *p, uint32_t offset, const uint8_t *data,
-                                uint32_t datalen) {
-    if (unlikely(offset + datalen > MAX_PAYLOAD_SIZE)) {
+inline int copy_data_offset(PACKET_T *pkt, uint32_t offset, const uint8_t *raw,
+                            uint32_t len) {
+    if (unlikely(offset + len > MAX_PAYLOAD_SIZE)) {
         /* too big */
         return -1;
     }
 
     /* Do we have already an packet with allocated data */
-    if (!p->ext_pkt) {
-        uint32_t newsize = offset + datalen;
+    if (!pkt->ext_pkt) {
+        uint32_t newsize = offset + len;
         // check overflow
         if (newsize < offset) return -1;
         if (newsize <= default_packet_size) {
             /* data will fit in memory allocated with packet */
-            memcpy(GET_PKT_DIRECT_DATA(p) + offset, data, datalen);
+            memcpy(GET_PKT_DIRECT_DATA(pkt) + offset, raw, len);
         } else {
             /* here we need a dynamic allocation */
-            p->ext_pkt = SCMalloc(MAX_PAYLOAD_SIZE);
-            if (unlikely(p->ext_pkt == NULL)) {
-                SET_PKT_LEN(p, 0);
+            pkt->ext_pkt = malloc(MAX_PAYLOAD_SIZE);
+            if (unlikely(pkt->ext_pkt == NULL)) {
+                SET_PKT_LEN(pkt, 0);
                 return -1;
             }
             /* copy initial data */
-            memcpy(p->ext_pkt, GET_PKT_DIRECT_DATA(p),
-                   GET_PKT_DIRECT_MAX_SIZE(p));
+            memcpy(pkt->ext_pkt, GET_PKT_DIRECT_DATA(pkt),
+                   GET_PKT_DIRECT_MAX_SIZE(pkt));
             /* copy data as asked */
-            memcpy(p->ext_pkt + offset, data, datalen);
+            memcpy(pkt->ext_pkt + offset, raw, len);
         }
     } else {
-        memcpy(p->ext_pkt + offset, data, datalen);
+        memcpy(pkt->ext_pkt + offset, data, len);
     }
     return 0;
 }
@@ -194,9 +193,9 @@ inline int PacketCopyDataOffset(Packet *p, uint32_t offset, const uint8_t *data,
  *  \param Pointer to the data to copy
  *  \param Length of the data to copy
  */
-inline int PacketCopyData(Packet *p, const uint8_t *pktdata, uint32_t pktlen) {
-    SET_PKT_LEN(p, (size_t)pktlen);
-    return PacketCopyDataOffset(p, 0, pktdata, pktlen);
+inline int copy_data(PACKET_T *pkt, const uint8_t *raw, uint32_t len) {
+    SET_PKT_LEN(pkt, (size_t)len);
+    return copy_data_offset(pkt, 0, raw, len);
 }
 
 /**
@@ -373,29 +372,29 @@ void PacketBypassCallback(Packet *p) {
 }
 
 /** \brief switch direction of a packet */
-void PacketSwap(Packet *p) {
-    if (PKT_IS_TOSERVER(p)) {
-        p->flowflags &= ~FLOW_PKT_TOSERVER;
-        p->flowflags |= FLOW_PKT_TOCLIENT;
+void swap_packet(PACKET_T *pkt) {
+    if (IS_TOSERVER(pkt)) {
+        pkt->flow_flags &= ~FLOW_PKT_TOSERVER;
+        pkt->flow_flags |= FLOW_PKT_TOCLIENT;
 
-        if (p->flowflags & FLOW_PKT_TOSERVER_FIRST) {
-            p->flowflags &= ~FLOW_PKT_TOSERVER_FIRST;
-            p->flowflags |= FLOW_PKT_TOCLIENT_FIRST;
+        if (pkt->flow_flags & FLOW_PKT_TOSERVER_FIRST) {
+            pkt->flow_flags &= ~FLOW_PKT_TOSERVER_FIRST;
+            pkt->flow_flags |= FLOW_PKT_TOCLIENT_FIRST;
         }
     } else {
-        p->flowflags &= ~FLOW_PKT_TOCLIENT;
-        p->flowflags |= FLOW_PKT_TOSERVER;
+        pkt->flow_flags &= ~FLOW_PKT_TOCLIENT;
+        pkt->flow_flags |= FLOW_PKT_TOSERVER;
 
-        if (p->flowflags & FLOW_PKT_TOCLIENT_FIRST) {
-            p->flowflags &= ~FLOW_PKT_TOCLIENT_FIRST;
-            p->flowflags |= FLOW_PKT_TOSERVER_FIRST;
+        if (pkt->flow_flags & FLOW_PKT_TOCLIENT_FIRST) {
+            pkt->flow_flags &= ~FLOW_PKT_TOCLIENT_FIRST;
+            pkt->flow_flags |= FLOW_PKT_TOSERVER_FIRST;
         }
     }
 }
 
 /* counter name store */
-static HashTable *g_counter_table = NULL;
-static SCMutex g_counter_table_mutex = SCMUTEX_INITIALIZER;
+static HASH_TABLE_T *g_counter_table = NULL;
+static pthread_mutex_t g_counter_table_mutex = SCMUTEX_INITIALIZER;
 
 void DecodeUnregisterCounters(void) {
     SCMutexLock(&g_counter_table_mutex);
@@ -569,33 +568,35 @@ void AddressDebugPrint(Address *a) {
 }
 
 /** \brief Alloc and setup DecodeThreadVars */
-DecodeThreadVars *DecodeThreadVarsAlloc(ThreadVars *tv) {
-    DecodeThreadVars *dtv = NULL;
+THREAD_VARS_T *thread_vars_alloc(THREAD_T *thread) {
+    THREAD_VARS_T *thread_vars = NULL;
 
-    if ((dtv = SCMalloc(sizeof(DecodeThreadVars))) == NULL) return NULL;
-    memset(dtv, 0, sizeof(DecodeThreadVars));
+    if ((thread_vars = malloc(sizeof(THREAD_VARS_T))) == NULL) return NULL;
+    memset(thread_vars, 0, sizeof(THREAD_VARS_T));
 
     dtv->app_tctx = AppLayerGetCtxThread(tv);
 
     if (OutputFlowLogThreadInit(tv, NULL, &dtv->output_flow_thread_data) !=
         TM_ECODE_OK) {
-        SCLogError(SC_ERR_THREAD_INIT,
-                   "initializing flow log API for thread failed");
-        DecodeThreadVarsFree(tv, dtv);
+        LOG_ERR_MSG(SC_ERR_THREAD_INIT,
+                    "initializing flow log API for thread failed");
+        free_thread_vars(thread, thread_vars);
         return NULL;
     }
 
-    return dtv;
+    return thread_vars;
 }
 
-void DecodeThreadVarsFree(ThreadVars *tv, DecodeThreadVars *dtv) {
-    if (dtv != NULL) {
-        if (dtv->app_tctx != NULL) AppLayerDestroyCtxThread(dtv->app_tctx);
+void free_thread_vars(THREAD_T *thread, THREAD_VARS_T *thread_vars) {
+    if (thread_vars != NULL) {
+        if (thread_vars->app_tctx != NULL)
+            AppLayerDestroyCtxThread(thread_vars->app_tctx);
 
-        if (dtv->output_flow_thread_data != NULL)
-            OutputFlowLogThreadDeinit(tv, dtv->output_flow_thread_data);
+        if (thread_vars->output_flow_thread_data != NULL)
+            OutputFlowLogThreadDeinit(thread,
+                                      thread_vars->output_flow_thread_data);
 
-        SCFree(dtv);
+        free(thread_vars);
     }
 }
 
@@ -606,19 +607,19 @@ void DecodeThreadVarsFree(ThreadVars *tv, DecodeThreadVars *dtv) {
  *  \param Pointer to the data
  *  \param Length of the data
  */
-inline int PacketSetData(Packet *p, const uint8_t *pktdata, uint32_t pktlen) {
-    SET_PKT_LEN(p, (size_t)pktlen);
-    if (unlikely(!pktdata)) {
+inline int set_data(PACKET_T *pkt, const uint8_t *raw, uint32_t len) {
+    SET_PKT_LEN(pkt, (size_t)len);
+    if (unlikely(!raw)) {
         return -1;
     }
     // ext_pkt cannot be const (because we sometimes copy)
-    p->ext_pkt = (uint8_t *)pktdata;
-    p->flags |= PKT_ZERO_COPY;
+    pkt->ext_pkt = (uint8_t *)raw;
+    pkt->flags |= PKT_ZERO_COPY;
 
     return 0;
 }
 
-const char *PktSrcToString(enum PktSrcEnum pkt_src) {
+const char *src_to_string(enum PKT_SRC_ENUM pkt_src) {
     const char *pkt_src_str = "<unknown>";
     switch (pkt_src) {
         case PKT_SRC_WIRE:
@@ -661,29 +662,23 @@ const char *PktSrcToString(enum PktSrcEnum pkt_src) {
     return pkt_src_str;
 }
 
-void CaptureStatsUpdate(ThreadVars *tv, CaptureStats *s, const Packet *p) {
+void update_capture_stats(THREAD_T *thread, CAPTURE_STATST *stats,
+                          const PACKET_T *pkt) {
     if (unlikely(PACKET_TEST_ACTION(
-            p, (ACTION_REJECT | ACTION_REJECT_DST | ACTION_REJECT_BOTH)))) {
-        StatsIncr(tv, s->counter_ips_rejected);
-    } else if (unlikely(PACKET_TEST_ACTION(p, ACTION_DROP))) {
-        StatsIncr(tv, s->counter_ips_blocked);
-    } else if (unlikely(p->flags & PKT_STREAM_MODIFIED)) {
-        StatsIncr(tv, s->counter_ips_replaced);
+            pkt, (ACTION_REJECT | ACTION_REJECT_DST | ACTION_REJECT_BOTH)))) {
+        StatsIncr(thread, stats->counter_ips_rejected);
+    } else if (unlikely(PACKET_TEST_ACTION(pkt, ACTION_DROP))) {
+        StatsIncr(thread, stats->counter_ips_blocked);
+    } else if (unlikely(pkt->flags & PKT_STREAM_MODIFIED)) {
+        StatsIncr(thread, stats->counter_ips_replaced);
     } else {
-        StatsIncr(tv, s->counter_ips_accepted);
+        StatsIncr(thread, stats->counter_ips_accepted);
     }
 }
 
-void CaptureStatsSetup(ThreadVars *tv, CaptureStats *s) {
-    s->counter_ips_accepted = StatsRegisterCounter("ips.accepted", tv);
-    s->counter_ips_blocked = StatsRegisterCounter("ips.blocked", tv);
-    s->counter_ips_rejected = StatsRegisterCounter("ips.rejected", tv);
-    s->counter_ips_replaced = StatsRegisterCounter("ips.replaced", tv);
-}
-
-void DecodeGlobalConfig(void) {
-    DecodeTeredoConfig();
-    DecodeGeneveConfig();
-    DecodeVXLANConfig();
-    DecodeERSPANConfig();
+void setup_capture_stats(THREAD_T *thread, CAPTURE_STATS_T *stats) {
+    stats->counter_ips_accepted = StatsRegisterCounter("ips.accepted", thread);
+    stats->counter_ips_blocked = StatsRegisterCounter("ips.blocked", thread);
+    stats->counter_ips_rejected = StatsRegisterCounter("ips.rejected", thread);
+    stats->counter_ips_replaced = StatsRegisterCounter("ips.replaced", thread);
 }

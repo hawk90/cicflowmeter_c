@@ -271,7 +271,7 @@ extern "C" {
          : ((f)->flags &= ~FLOW_TC_PE_ALPROTO_DETECT_DONE))
 
 /* global flow config */
-typedef struct FLOW_CONFIG_ {
+typedef struct _FLOW_CONFIG_T {
     uint32_t hash_rand;
     uint32_t hash_size;
     uint32_t max_flows;
@@ -285,24 +285,24 @@ typedef struct FLOW_CONFIG_ {
     uint32_t emergency_recovery;
 
     ATOMIC_DECLARE(uint64_t, mem_cap);
-} FLOW_CONFIG;
+} FLOW_CONFIG_T;
 
 /* Hash key for the flow hash */
-typedef struct FLOW_KEY_ {
-    ADDRESS src, dst;
-    PORT sp, dp;
+typedef struct _FLOW_KEY_T {
+    ADDR_T src, dst;
+    PORT_T sport, dport;
     uint8_t proto;
     uint8_t recursion_level;
     uint16_t vlan_id[2];
-} FLOW_KEY;
+} FLOW_KEY_T;
 
-typedef struct FLOW_ADDR_ {
+typedef struct _FLOW_ADDR_T {
     union {
         uint32_t address_un_data32[4]; /* type-specific field */
         uint16_t address_un_data16[8]; /* type-specific field */
         uint8_t address_un_data8[16];  /* type-specific field */
     } address;
-} FLOW_ADDR;
+} FLOW_ADDR_T;
 
 #define addr_data32 address.address_un_data32
 #define addr_data16 address.address_un_data16
@@ -333,19 +333,19 @@ typedef uint16_t flow_thread_id;
  *  of a flow. This is why we can access those without protection of the lock.
  */
 
-typedef struct FLOW_ {
+typedef struct _FLOW_T {
     /* flow "header", used for hashing and flow lookup. Static after init,
      * so safe to look at without lock */
-    FLOWAddress src, dst;
+    FLOW_ADDR_T src, dst;
     union {
-        Port sp; /**< tcp/udp source port */
+        PORT_T sport; /**< tcp/udp source port */
         struct {
             uint8_t type; /**< icmp type */
             uint8_t code; /**< icmp code */
         } icmp_s;
     };
     union {
-        Port dp; /**< tcp/udp destination port */
+        PORT_T dport; /**< tcp/udp destination port */
         struct {
             uint8_t type; /**< icmp type */
             uint8_t code; /**< icmp code */
@@ -369,7 +369,7 @@ typedef struct FLOW_ {
 
     /* end of flow "header" */
 
-    SC_ATOMIC_DECLARE(FLOWStateType, flow_state);
+    ATOMIC_DECLARE(FLOWStateType, flow_state);
 
     /** how many pkts and stream msgs are using the flow *right now*. This
      *  variable is atomic so not protected by the FLOW mutex "m".
@@ -377,7 +377,7 @@ typedef struct FLOW_ {
      *  On receiving a packet the counter is incremented while the flow
      *  bucked is locked, which is also the case on timeout pruning.
      */
-    SC_ATOMIC_DECLARE(FLOWRefCount, use_cnt);
+    ATOMIC_DECLARE(FLOWRefCount, use_cnt);
 
     /** flow tenant id, used to setup flow timeout and stream pseudo
      *  packets with the correct tenant id set */
@@ -472,7 +472,7 @@ typedef struct FLOW_ {
     uint32_t to_src_pkt_cnt;
     uint64_t to_dst_byte_cnt;
     uint64_t to_src_bytec_nt;
-} FLOW;
+} FLOW_T;
 
 enum FLOW_STATE {
     FLOW_STATE_NEW = 0,
