@@ -29,6 +29,7 @@ extern "C" {
 #if HAVE_LIMITS_H
 #include <limits.h>
 #endif
+
 #include <ctype.h>
 #include <string.h>
 #include <strings.h>
@@ -100,8 +101,9 @@ typedef unsigned long int u_long
 #include <sys/random.h>
 #endif
 
-#include <arpa/inet.h>
 #include <netinet/in.h>
+
+#include <arpa/inet.h>
 
 #if HAVE_NETDB_H
 #include <netdb.h>
@@ -254,9 +256,10 @@ typedef unsigned long int u_long
     } while (0)
 
     /** \note update PacketProfileLoggertIdToString if you change anything here
-    */
+     */
     typedef enum {
         LOGGER_UNDEFINED,
+
         /* TX loggers first for low logger IDs */
         LOGGER_DNS_TS,
         LOGGER_DNS_TC,
@@ -285,6 +288,7 @@ typedef unsigned long int u_long
         LOGGER_JSON_TEMPLATE,
         LOGGER_JSON_RDP,
         LOGGER_JSON_DCERPC,
+
         LOGGER_ALERT_DEBUG,
         LOGGER_ALERT_FAST,
         LOGGER_UNIFIED2,
@@ -308,7 +312,6 @@ typedef unsigned long int u_long
 
 /*
 #include <htp/htp.h>
-
 #include "detect-engine-alert.h"
 #include "threads.h"
 #include "tm-threads-common.h"
