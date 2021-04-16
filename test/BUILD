@@ -7,7 +7,7 @@ cc_test(
 	name = "unittest",
 	srcs = glob(["unittest.cc"]),
 	deps = [
-		"//cicflowmeter-c/util:util-dep",
+		"//cicflowmeter-c/utils:utils-dep",
 		"//test:test-dep",
 		"@gtest//:gtest",
 		"@gtest//:gtest_main",
