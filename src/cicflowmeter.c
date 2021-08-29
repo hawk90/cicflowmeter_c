@@ -1,9 +1,6 @@
 #include "common/cicflowmeter_common.h"
 #include "utils/debug.h"
 
-#include <pcap.h>
-#include <pcap/pcap.h>
-
 #define NEXT_EX_OK 1
 
 void hello_print() {
@@ -46,11 +43,10 @@ int main(int argc, char *argv[]) {
 		goto error;
 	}	
 
-    /*
 	rc = pcap_next_ex(handle, &header, &pkt);
 	if(rc == NEXT_EX_OK) {
+        printf("Detect pkt\n"); 
 	}
-    */
     goodbye_print();
     return 0;
 

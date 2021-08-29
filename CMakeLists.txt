@@ -19,3 +19,5 @@ include_directories(include)
 # Add executable target with source files listed in SOURCE_FILES variable
 add_executable(CICFLOWMETER src/cicflowmeter.c)
 target_link_libraries(CICFLOWMETER ${PCAP_LIBRARY})
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
