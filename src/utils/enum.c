@@ -1,7 +1,7 @@
-#include "cicflowmeter-c/common/cicflowmeter_common.h"
+#include "common/cicflowmeter_common.h"
 
-#include "debug.h"
-#include "enum.h"
+#include "utils/debug.h"
+#include "utils/enum.h"
 
 int get_map_value(const char *key, MAP_T *map) {
     int result = -1;

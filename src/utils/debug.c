@@ -1,6 +1,6 @@
-#include "cicflowmeter-c/common/cicflowmeter_common.h"
+#include "common/cicflowmeter_common.h"
 
-#include "debug.h"
+#include "utils/debug.h"
 
 MAP_T g_log_level_map[] = {{"Not set", LOG_NOTSET},
                            {"None", LOG_NONE},

@@ -1,6 +1,6 @@
-#include "cicflowmeter-c/common/cicflowmeter_common.h"
+#include "common/cicflowmeter_common.h"
 
-#include "print.h"
+#include "utils/print.h"
 
 void dump_hex_line(char *nbuf, uint32_t *offset_ptr, const uint32_t nbuf_size,
                    const char *buf, uint32_t buf_size) {

@@ -1,4 +1,5 @@
 #include "common/cicflowmeter_common.h"
+
 #include "utils/debug.h"
 
 #define NEXT_EX_OK 1
@@ -27,12 +28,11 @@ void goodbye_print() {
     printf("\n\n");
 }
 
-
 int main(int argc, char *argv[]) {
     hello_print();
 
 	int rc = 0;
-	const char *dev = "enp0s3";
+	const char *dev = "en0";
 	pcap_t *handle;
 	char error_buffer[PCAP_ERRBUF_SIZE];
 	struct pcap_pkthdr *header = NULL;
@@ -48,6 +48,7 @@ int main(int argc, char *argv[]) {
         printf("Detect pkt\n"); 
 	}
     goodbye_print();
+    LOG_INFO_MSG("Done!\n");
     return 0;
 
 error:

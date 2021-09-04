@@ -5,40 +5,44 @@
 extern "C" {
 #endif
 
-#include "enum.h"
-#include "error.h"
+#include <stdarg.h>
+
+#include "common/cicflowmeter_common.h"
+
+#include "utils/enum.h"
+#include "utils/error.h"
 
 #if defined __GNUC__
-#define CHECK_PRINTF(m, n) __attribute__((format(printf, m, n)))
+    #define CHECK_PRINTF(m, n) __attribute__((format(printf, m, n)))
 #else
-#define CHECK_PRINTF(m, n)
+    #define CHECK_PRINTF(m, n)
 #endif
 
 typedef enum {
-    LOG_NOTSET = -1, /* */
-    LOG_NONE = 0,    /* */
-    LOG_TRACE,       /* finer-grained information events than the DEBUG */
-    LOG_DEBUG,  /* fine-grained information events that are most useful to debug
-                   an application */
-    LOG_CONFIG, /* */
-    LOG_PERF,   /* */
-    LOG_INFO,   /* information messages that highlight the progress of the
-                   application at coarse-grained level */
-    LOG_NOTICE, /* */
-    LOG_WARNING, /* potentially harmful situations */
-    LOG_ERROR, /* error events that migh still allow the application to continue
-                  running */
-    LOG_CRITICAL,  /* */
-    LOG_ALERT,     /* */
-    LOG_EMERGENCY, /* */
-    LOG_LEVEL_MAX, /* */
+    LOG_NOTSET = -1,    /* */
+    LOG_NONE = 0,       /* */
+    LOG_TRACE,          /* finer-grained information events than the DEBUG */
+    LOG_DEBUG,          /* fine-grained information events that are most useful
+                           to debug an application */
+    LOG_CONFIG,         /* */
+    LOG_PERF,           /* */
+    LOG_INFO,           /* information messages that highlight the progress
+                           of the application at coarse-grained level */
+    LOG_NOTICE,         /* */
+    LOG_WARNING,        /* potentially harmful situations */
+    LOG_ERROR,          /* error events that migh still allow the application
+                           to continue running */
+    LOG_CRITICAL,       /* */
+    LOG_ALERT,          /* */
+    LOG_EMERGENCY,      /* */
+    LOG_LEVEL_MAX,      /* */
 } LOG_LEVEL_T;
 
 typedef enum {
     LOG_TYPE_STREAM = 0,
     LOG_TYPE_FILE,
     LOG_TYPE_STREAM_AND_FILE,
-} LOG_TYPE_T; /* LogOPIface and LogOPType */
+} LOG_TYPE_T;
 
 #define MAX_LOG_MSG_LEN 2048   /* The maximum length of the log message */
 #define MAX_LOG_FORMAT_LEN 128 /* The maximum length of the log format */
@@ -54,7 +58,6 @@ typedef enum {
 #define DEFLOG_FILE "cicflowmeter.log"
 
 #define DEF_LOG_FORMAT_REL "%t - <%d> - "
-//#define DEF_LOG_FORMAT_DEV "[%i] %t - (%f:%l) <%d> (%n) -- "
 #define DEF_LOG_FORMAT_DEV "%t - (%f:%l) <%d> (%n) -- "
 
 /* The log format prefix for the format specifiers */

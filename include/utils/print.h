@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "debug.h"
+#include "utils/debug.h"
 
 #define DUMP(buffer, buffer_offset_ptr, buffer_size, ...)                     \
     do {                                                                      \
